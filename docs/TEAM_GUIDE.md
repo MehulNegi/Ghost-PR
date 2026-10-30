@@ -100,7 +100,7 @@ killed, successful runs to survived, and other problems to excluded outcomes.
 `reporting.py` produces terminal/JSON data and exit 0/1/2. No survivors means
 only that these chosen mutations were not observed to survive; it is not safety.
 
-Run: `python3 -m ghost_pr run --repo /path/to/trusted/repo --test tests --json`.
+Run: `python3 -m ghost_pr haunt --repo /path/to/trusted/repo --test tests --json`.
 Repeat `--test` for multiple selected paths. JSON adds outcome counts and a
 `detection_ratio` number or null. A failed or empty baseline produces no mutants.
 
@@ -142,7 +142,7 @@ python -m unittest discover -s tests -p test_ai_verification.py -v
 
 These tests use labelled recorded responses and real pytest processes; they do
 not establish live model quality. On a fresh demo with a surviving mutant, opt
-into real inference with `ghost run --repo PATH --test test_bank.py --ai-model
+into real inference with `ghost haunt --repo PATH --test test_bank.py --ai-model
 EXACT_INSTALLED_NAME --show-ai-test`. There is no automatic model download.
 The official chat/tags API and local-only server setting are linked in README.
 
@@ -209,10 +209,9 @@ with pytest. This creates a new fixture containing only the initial test:
 ```bash
 GHOST_DEMO_DIR="$(mktemp -d)/withdrawal"
 /private/tmp/ghost-pr-dev/bin/python examples/create_demo.py "$GHOST_DEMO_DIR"
-/private/tmp/ghost-pr-dev/bin/python -m ghost_pr run \
+/private/tmp/ghost-pr-dev/bin/python -m ghost_pr haunt \
   --repo "$GHOST_DEMO_DIR" --test test_bank.py --max-mutants 1 \
-  --ai-model qwen2.5-coder:3b --ai-endpoint http://127.0.0.1:11434 \
-  --json --show-ai-test
+  --ai --json --show-ai-test
 ```
 
 Check ai.response_received, ai.original.status and ai.mutant.status. Only original
@@ -310,3 +309,24 @@ Three likely judge questions:
    general model reliability or business requirements. The detection ratio is
    killed/(killed+survived), excluding timeout/error, with N/A for zero denominator;
    it is never a safety score.
+
+## Haunt and the compatibility alias
+
+`main` builds one execution parser: haunt, with run as its argparse alias. Both
+names normalize to the same command value before entering the existing analysis
+branch. Check retains its separate inspection path. Without --repo the current
+directory is inspected; --test is still required and repeatable.
+
+Input -> command/options -> one parser -> resolve --ai defaults -> the existing
+`analyze_repository` call -> unchanged reporting and exit codes. --ai selects
+qwen2.5-coder:3b at http://127.0.0.1:11434; explicit model/endpoint values win.
+An explicit --ai-model still enables AI alone. No mutation or verification logic
+changed. The existing pyproject console entry point remains ghost_pr.cli:main.
+
+From inside a trusted project: `ghost haunt --test tests --ai`. The compatible
+spelling is `ghost run --test tests --ai`. AI remains optional; omit its enabling
+flags for deterministic mutation testing.
+
+Questions: Why use argparse aliases rather than copy the command handler? Which
+model wins when --ai and --ai-model are both present? Does haunt choose tests
+automatically? (One shared route; the explicit model; no, --test remains required.)

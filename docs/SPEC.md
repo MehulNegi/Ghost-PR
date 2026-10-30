@@ -45,15 +45,22 @@ No command/service classes unless state or complexity justifies them.
 
 ## Execution contract
 
-`ghost run --repo PATH --test tests/test_file.py [--test OTHER]`
+`ghost haunt [--repo PATH] --test tests/test_file.py [--test OTHER]`
 explicitly executes trusted project code. Test values are relative file/directory
 paths, optionally with pytest `::node` selectors; options, absolute paths and
 parent traversal are rejected. Dependencies, including pytest, must be installed
-in the current Python interpreter. No package installation occurs.
+in the current Python interpreter. No package installation occurs. The repository
+defaults to the current directory. `ghost run` remains a compatibility alias for
+the same parser and implementation, with identical options and exit codes.
+`ghost check` remains read-only staged inspection; it does not execute tests or AI.
 
 Options: `--timeout` positive finite seconds (default 10), `--max-mutants` 1–5
-(default 5), `--json`, optional `--ai-model NAME` and `--ai-endpoint URL`
-(default `http://127.0.0.1:11434`). No AI request without a model option.
+(default 5), `--json`, optional `--ai`, `--ai-model NAME` and `--ai-endpoint URL`
+(default `http://127.0.0.1:11434`). `--ai` enables AI using qwen2.5-coder:3b
+unless `--ai-model` is explicitly supplied. An explicit endpoint overrides the
+default independently. `--ai-model` alone continues to enable AI; endpoint alone
+does not. Option order does not affect this precedence. `--show-ai-test` requires
+`--ai` or an explicit model. No AI request when neither enabling option is used.
 Exit 0: completed without survivors; 1: completed with survivors;
 2: inspection, snapshot, baseline, or mutant execution failure. Timeouts and
 execution errors take precedence over survivors. Optional AI failure is reported
@@ -219,12 +226,12 @@ is attempted. A mutant call failure verifies a distinction; success, no-tests,
 timeout, collection/setup error or original failure remains unverified with
 the observed outcomes. Both runs are bounded and cleaned up.
 
-`--ai-model` opts into local request and proposed-code execution for a trusted
+`--ai` or `--ai-model` opts into local request and proposed-code execution for a trusted
 project. Core exit status remains based on mutation analysis. AIResult records
 status, sanitized detail, whether a model response arrived, target mutation,
 and verification outcomes. Source/test code and explanation are hidden by
 default; `--show-ai-test` explicitly includes a validated proposal in terminal
-or JSON output. It requires `--ai-model`. No generated file is retained or
+or JSON output. It requires `--ai` or `--ai-model`. No generated file is retained or
 written into the original repo. Acceptance: recorded exact-balance success,
 original failure, mutant survival, unavailable model and malformed response;
 original files and index remain unchanged.
@@ -280,3 +287,27 @@ Manual adoption is intentional editing by the contributor after review. To
 demonstrate the same mutation again, leave bank.py staged against the fixture's
 empty HEAD; stage the reviewed generated test and rerun both selected test files.
 Only claim the adopted run killed the mutant after observing its output.
+
+## Haunt command change: acceptance checklist
+
+Inputs: existing CLI options, with haunt as primary name and run as an alias.
+Output: the existing RunReport and terminal/JSON output. Repository default,
+required explicit test paths, repeated --test values, node selectors, failures
+and exit 0/1/2 remain unchanged. The configured console entry point remains
+`ghost = "ghost_pr.cli:main"`. Mutation and AI verification code are out of scope.
+
+- [x] Inspect starter and run existing suite: 38 tests pass before edits.
+- [x] Define command/AI precedence before implementation.
+- [x] Route haunt/run through one parser and one execution branch; 4 CLI and 5 analysis tests pass.
+- [x] Add --ai defaults without overriding explicit choices; 6 CLI tests pass.
+- [x] Update README/help/demo examples and rerun the deterministic demo.
+- [x] Run complete suite and review only the intended changes: 44 tests passed
+  in 16.989 seconds using `/private/tmp/ghost-pr-dev/bin/python -m unittest
+  discover -s tests -v`.
+
+Deterministic acceptance: haunt and run, invoked from the target directory
+without --repo, produced identical JSON and exit 1 for the partial-test survivor.
+After explicitly staging the manual boundary assertion, haunt reported two
+passing baseline tests, one killed mutant and exit 0. Each run preserved source
+and index bytes and removed run copies. No AI was requested. The existing console
+entry-point configuration was loaded and confirmed to resolve to cli.main.

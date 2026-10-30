@@ -111,20 +111,28 @@ def main(argv: list[str] | None = None) -> int:
     check = commands.add_parser("check", help="Inspect staged scope; does not run tests or AI")
     check.add_argument("--repo", type=Path, default=Path.cwd())
     check.add_argument("--json", action="store_true")
-    run = commands.add_parser("run", help="Execute tests and mutations in trusted disposable copies")
-    run.add_argument("--repo", type=Path, default=Path.cwd())
-    run.add_argument("--test", action="append", required=True, help="Relative test path; repeat for multiple paths")
-    run.add_argument("--timeout", type=float, default=10)
-    run.add_argument("--max-mutants", type=int, choices=range(1, 6), default=5)
-    run.add_argument("--json", action="store_true")
-    run.add_argument("--ai-model", help="Already-installed local Ollama model; opts into proposed test execution")
-    run.add_argument("--ai-endpoint", default="http://127.0.0.1:11434")
-    run.add_argument("--show-ai-test", action="store_true", help="Explicitly display validated proposed code and explanation")
+    haunt = commands.add_parser("haunt", aliases=["run"],
+                                help="Execute tests and mutations in trusted copies (run is a compatibility alias)")
+    haunt.set_defaults(command="haunt")
+    haunt.add_argument("--repo", type=Path, default=Path.cwd(), help="Repository path (default: current directory)")
+    haunt.add_argument("--test", action="append", required=True, help="Relative test path; repeat for multiple paths")
+    haunt.add_argument("--timeout", type=float, default=10)
+    haunt.add_argument("--max-mutants", type=int, choices=range(1, 6), default=5)
+    haunt.add_argument("--json", action="store_true")
+    haunt.add_argument("--ai", action="store_true",
+                       help="Enable local AI with qwen2.5-coder:3b at http://127.0.0.1:11434")
+    haunt.add_argument("--ai-model", help="Enable AI with an installed Ollama model (overrides --ai model)")
+    haunt.add_argument("--ai-endpoint", default="http://127.0.0.1:11434",
+                       help="Local Ollama URL (default: http://127.0.0.1:11434; overrides --ai endpoint)")
+    haunt.add_argument("--show-ai-test", action="store_true", help="Explicitly display validated proposed code and explanation")
     args = parser.parse_args(argv)
-    if args.command == "run" and args.show_ai_test and not args.ai_model:
-        parser.error("--show-ai-test requires --ai-model")
+    if args.command == "haunt":
+        if args.ai and args.ai_model is None:
+            args.ai_model = "qwen2.5-coder:3b"
+        if args.show_ai_test and not args.ai_model:
+            parser.error("--show-ai-test requires --ai or --ai-model")
     try:
-        if args.command == "run":
+        if args.command == "haunt":
             report = analyze_repository(args.repo, args.test, args.timeout, args.max_mutants,
                                         args.ai_model, args.ai_endpoint)
             if args.json:

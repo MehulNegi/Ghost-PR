@@ -48,7 +48,7 @@ diff. No generated or prepared boundary test is present.
 ## 0:30–1:00 — Establish the baseline and survivor
 
 ```bash
-ghost run --repo "$GHOST_DEMO_DIR" --test test_bank.py --max-mutants 1
+ghost haunt --repo "$GHOST_DEMO_DIR" --test test_bank.py --max-mutants 1
 ```
 
 Expect baseline passed, one survivor, ratio 0/1, exit 1. The test exercises a
@@ -57,12 +57,13 @@ each test run uses a fresh copy. The contributor's source and index stay intact.
 
 ## 1:00–2:00 — Request and verify a real local proposal
 
-Use readable output, with no `--json`:
+Use readable output, with no `--json`. `haunt` is the primary command;
+`run` is a compatibility alias. `--ai` selects qwen2.5-coder:3b at the default
+loopback endpoint; explicit model/endpoint options remain available:
 
 ```bash
-ghost run --repo "$GHOST_DEMO_DIR" --test test_bank.py --max-mutants 1 \
-  --ai-model qwen2.5-coder:3b --ai-endpoint http://127.0.0.1:11434 \
-  --show-ai-test
+ghost haunt --repo "$GHOST_DEMO_DIR" --test test_bank.py --max-mutants 1 \
+  --ai --show-ai-test
 ```
 
 The model receives the actual function, before/after mutation expressions and
@@ -95,7 +96,7 @@ Open a new test file and manually paste only the reviewed generated Python:
 nano "$GHOST_DEMO_DIR/test_generated_boundary.py"
 git -C "$GHOST_DEMO_DIR" add -- test_generated_boundary.py
 git -C "$GHOST_DEMO_DIR" diff --cached -- test_generated_boundary.py
-ghost run --repo "$GHOST_DEMO_DIR" --test test_bank.py \
+ghost haunt --repo "$GHOST_DEMO_DIR" --test test_bank.py \
   --test test_generated_boundary.py --max-mutants 1
 ```
 
@@ -140,4 +141,22 @@ have no run copies remaining afterward. Adoption/staging intentionally changes
 the source/index, so start a new checksum baseline before the adopted-test run.
 Temporary copies are not security sandboxes; detached processes that escape
 their process group remain unsupported. Linux and Python 3.11 were not tested
-here. No new features or runtime changes were made for this handoff.
+here. This evidence predates the haunt naming change; the deterministic rerun below
+checks the current command routes.
+
+## Haunt compatibility rerun
+
+After the CLI naming change, the full suite passed **44 tests in 16.989 seconds**
+using the same interpreter/command above. In a fresh deterministic fixture:
+
+- Both haunt and its run alias, with no --repo option, inspected the current
+  directory and returned identical JSON: baseline passed, one survivor, exit 1.
+- After staging the existing manual boundary assertion, haunt reported a passing
+  two-test baseline, one killed mutant and exit 0.
+- All three runs preserved original file hashes and raw index bytes and left no
+  temporary run copies. The disposable fixture was removed afterward.
+- The configured ghost console entry point resolves to ghost_pr.cli:main.
+
+This rerun used no AI. Its manual assertion is deterministic fixture material,
+separate from the team's live model-generated test recorded above. CLI tests
+also verify --ai defaults, explicit overrides, and preserved test selection.
