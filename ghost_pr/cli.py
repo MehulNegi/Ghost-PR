@@ -1,6 +1,5 @@
 """Parse commands and orchestrate inspection, independent runs and optional AI."""
 import argparse
-from dataclasses import asdict
 import json
 import math
 from pathlib import Path
@@ -11,8 +10,9 @@ import tempfile
 from .local_ai import AIError, build_context, request_proposal, validate_proposal
 from .models import AIResult, Mutation, MutationResult, RunReport, SkippedFile, TestProposal, TestRun
 from .mutations import discover_mutations, generate_mutant, read_python
+from .preflight import check_repository
 from .repository import RepositoryError, inspect_repository, staged_snapshot
-from .reporting import analysis_data, analysis_exit_code, print_analysis, print_inspection
+from .reporting import analysis_data, analysis_exit_code, check_data, check_exit_code, print_analysis, print_check
 from .runner import run_tests, validate_test_paths
 
 
@@ -108,7 +108,7 @@ def analyze_repository(path: Path, paths: list[str], timeout: float = 10,
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Ghost-PR staged Python inspection and mutation analysis")
     commands = parser.add_subparsers(dest="command", required=True)
-    check = commands.add_parser("check", help="Inspect staged scope; does not run tests or AI")
+    check = commands.add_parser("check", help="Inspect staged scope, whitespace and suspected credentials; no tests or AI")
     check.add_argument("--repo", type=Path, default=Path.cwd())
     check.add_argument("--json", action="store_true")
     haunt = commands.add_parser("haunt", aliases=["run"],
@@ -140,21 +140,28 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 print_analysis(report, args.show_ai_test)
             return analysis_exit_code(report)
-        result = inspect_repository(args.repo)
+        result = check_repository(args.repo)
     except (RepositoryError, ValueError) as exc:
         if getattr(args, "json", False):
-            print(json.dumps({"error": str(exc)}))
+            error = {"error": str(exc)}
+            if args.command == "check":
+                error["complete"] = False
+            print(json.dumps(error))
         else:
             print(f"Ghost-PR: {exc}", file=sys.stderr)
         return 2
     except OSError:
+        message = "Check filesystem operation failed." if args.command == "check" else "Snapshot filesystem operation failed."
         if getattr(args, "json", False):
-            print(json.dumps({"error": "Snapshot filesystem operation failed."}))
+            error = {"error": message}
+            if args.command == "check":
+                error["complete"] = False
+            print(json.dumps(error))
         else:
-            print("Ghost-PR: snapshot filesystem operation failed.", file=sys.stderr)
+            print(f"Ghost-PR: {message}", file=sys.stderr)
         return 2
     if args.json:
-        print(json.dumps(asdict(result), ensure_ascii=True))
+        print(json.dumps(check_data(result), ensure_ascii=True))
     else:
-        print_inspection(result)
-    return 0
+        print_check(result)
+    return check_exit_code(result)

@@ -18,6 +18,53 @@ def read_python(path: Path) -> str:
         return source.read()
 
 
+def has_sensitive_code(scope: ast.AST) -> bool:
+    """Check executable names/literals, ignoring documentation and comments."""
+    nodes = list(ast.walk(scope))
+    docstrings = set()
+    for node in nodes:
+        if isinstance(node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            if ast.get_docstring(node, clean=False) is not None:
+                docstrings.add(node.body[0].value)
+    for node in nodes:
+        if isinstance(node, ast.Name):
+            text = node.id
+        elif isinstance(node, ast.Attribute):
+            text = node.attr
+        elif isinstance(node, (ast.arg, ast.keyword)):
+            text = node.arg or ""
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            text = node.name
+        elif isinstance(node, ast.alias):
+            text = node.name + " " + (node.asname or "")
+        elif isinstance(node, ast.ImportFrom):
+            text = node.module or ""
+        elif isinstance(node, ast.Constant) and isinstance(node.value, str) and node not in docstrings:
+            text = node.value
+        else:
+            continue
+        if AUTH_WORDS.search(text):
+            return True
+    return False
+
+
+def mutation_is_sensitive(node: ast.AST, parents: dict[ast.AST, ast.AST]) -> bool:
+    """Keep security context local to the candidate, rather than sibling code."""
+    function = None
+    statement = None
+    current = node
+    while current is not None:
+        if isinstance(current, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            if AUTH_WORDS.search(current.name):
+                return True
+        if function is None and isinstance(current, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            function = current
+        if statement is None and isinstance(current, ast.stmt):
+            statement = current
+        current = parents.get(current)
+    return has_sensitive_code(function or statement or node)
+
+
 def discover_mutations(root: Path, files: tuple[ChangedFile, ...]) -> tuple[list[Mutation], list[SkippedFile]]:
     mutations = []
     skipped = []
@@ -32,10 +79,10 @@ def discover_mutations(root: Path, files: tuple[ChangedFile, ...]) -> tuple[list
         except (OSError, SyntaxError, UnicodeError):
             skipped.append(SkippedFile(changed.path, "source cannot be parsed"))
             continue
-        # Conservative text heuristic; this is not semantic security analysis.
-        if AUTH_WORDS.search(changed.path) or AUTH_WORDS.search(source):
-            skipped.append(SkippedFile(changed.path, "authentication/sensitive cues; excluded conservatively"))
+        if AUTH_WORDS.search(changed.path):
+            skipped.append(SkippedFile(changed.path, "mutation_sensitive_path: unsupported authentication/sensitive path"))
             continue
+        parents = {child: parent for parent in ast.walk(tree) for child in ast.iter_child_nodes(parent)}
         found = False
         for node in ast.walk(tree):
             if not isinstance(node, (ast.Compare, ast.Constant)):
@@ -61,6 +108,10 @@ def discover_mutations(root: Path, files: tuple[ChangedFile, ...]) -> tuple[list
             else:
                 continue
             found = True
+            if mutation_is_sensitive(node, parents):
+                skipped.append(SkippedFile(changed.path,
+                    f"line {node.lineno}: mutation_sensitive_scope: unsupported authentication/sensitive code"))
+                continue
             mutations.append(Mutation(changed.path, node.lineno, node.col_offset,
                                       type(node).__name__, operator, before, after))
         if not found:

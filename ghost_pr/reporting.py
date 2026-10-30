@@ -1,7 +1,42 @@
 """Present observed results without implying code safety or business correctness."""
 from dataclasses import asdict
 
-from .models import Inspection, RunReport
+from .models import CheckReport, Inspection, RunReport
+
+
+def check_data(report: CheckReport) -> dict:
+    data = asdict(report)
+    inspection = data.pop("inspection")
+    return {**inspection, **data, "complete": all(check.complete for check in report.checks)}
+
+
+def check_exit_code(report: CheckReport) -> int:
+    if not all(check.complete for check in report.checks):
+        return 2
+    return 1 if report.findings else 0
+
+
+def print_check(report: CheckReport) -> None:
+    print_inspection(report.inspection)
+    for kind, title in (("whitespace", "Whitespace findings"), ("suspected_secret", "Suspected-secret findings")):
+        print(f"{title}:")
+        findings = [finding for finding in report.findings if finding.kind == kind]
+        for finding in findings:
+            print(f"  {ascii(finding.path)}:{finding.line} [{finding.rule_id}] {finding.message}")
+        if not findings:
+            print("  None detected in checked text.")
+    print("Check completion and skipped coverage:")
+    for check in report.checks:
+        state = "complete" if check.complete else "incomplete"
+        print(f"  {check.name}: {state}; {check.checked_files} file(s). {check.message}")
+        for skipped in check.skipped:
+            print(f"    SKIPPED {ascii(skipped.path)}: {skipped.reason}")
+    if check_exit_code(report) == 2:
+        print("Result: incomplete; required coverage is missing.")
+    elif report.findings:
+        print(f"Result: {len(report.findings)} finding(s) detected.")
+    else:
+        print("Result: no findings detected by these checks; this is not a safety verdict.")
 
 
 def outcome_counts(report: RunReport) -> dict[str, int]:
@@ -33,9 +68,9 @@ def print_inspection(inspection: Inspection) -> None:
     for item in inspection.files:
         print(f"  {ascii(item.path)}: changed lines {', '.join(map(str, item.lines))}")
     for item in inspection.skipped:
-        print(f"  SKIPPED {ascii(item.path)}: {item.reason}")
-    print(f"Reviewed scope: {len(inspection.files)} Python file(s). Untracked excluded: {inspection.untracked_count}.")
-    print("Inspection only; no project code or AI executed.")
+        print(f"  PYTHON-SCOPE SKIP {ascii(item.path)}: {item.reason}")
+    print(f"Python inspection scope: {len(inspection.files)} file(s). Untracked excluded: {inspection.untracked_count}.")
+    print("No project code or AI executed.")
 
 
 def print_analysis(report: RunReport, show_ai_test: bool = False) -> None:

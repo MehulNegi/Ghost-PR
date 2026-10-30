@@ -16,6 +16,19 @@ LOCAL_MODEL = {"models": [{"name": "demo:latest", "size": 100,
 
 
 class AdapterTests(unittest.TestCase):
+    def test_mutation_permission_does_not_bypass_ai_credential_screen(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "arithmetic.py").write_text(
+                "api_key = 'fixture-not-a-real-key'\ndef bounded(value, limit):\n    return value <= limit\n")
+            (root / "test_arithmetic.py").write_text(
+                "from arithmetic import bounded\ndef test_bounded(): assert bounded(1, 2)\n")
+            mutations, skipped = discover_mutations(root, (ChangedFile("arithmetic.py", (3,)),))
+            self.assertEqual(len(mutations), 1)
+            self.assertFalse(skipped)
+            with self.assertRaisesRegex(AIError, "suspected credentials"):
+                build_context(root, mutations[0], ["test_arithmetic.py"])
+
     def test_proposal_validation(self):
         recorded = {"explanation": "Recorded boundary example", "test_code": "from bank import withdraw\ndef test_exact(): assert withdraw(100, 100) == 0\n"}
         self.assertIn("test_exact", validate_proposal(json.dumps(recorded)).test_code)

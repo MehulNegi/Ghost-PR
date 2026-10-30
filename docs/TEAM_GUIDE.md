@@ -82,8 +82,10 @@ records. `generate_mutant` reparses original source for each record, checks its
 location and expression text, changes one node, unparses, and compiles. It never
 uses the previous mutant as input. Multiline expressions qualify when any of
 their lines changed. Chained comparisons and tests are skipped. Authentication
-or sensitive text cues conservatively exclude whole files; this heuristic cannot
-understand business security rules. Review target code before using the tool.
+or sensitive path cues exclude files. Within other files, AST screening checks
+the candidate's function or statement and enclosing definition names, ignoring
+comments, docstrings and unrelated sibling code. This heuristic cannot understand
+business security rules. Review target code before using the tool.
 
 Unparsing discards comments and formatting; generated files use UTF-8. This keeps
 the transformation simple at the cost of readable source diffs.
@@ -258,7 +260,8 @@ Three likely judge questions:
 2. **How do you limit scope?** Use changed-line intersections, deterministic
    ordering and at most five mutants. Operators are <= to <, >= to >, == to !=
    and Boolean flips. Tests and chained comparisons are skipped. Sensitive-code
-   cues conservatively exclude files; the heuristic is not semantic analysis.
+   cues conservatively exclude relevant code scopes, and sensitive paths exclude
+   files; the heuristic is not semantic analysis.
 3. **Why not accumulate mutations?** Then a failure could be caused by another
    change. Each fresh AST and disposable copy contains one independent mutation.
    A survivor can be equivalent or unexercised; it does not automatically prove
@@ -314,7 +317,7 @@ Three likely judge questions:
 
 `main` builds one execution parser: haunt, with run as its argparse alias. Both
 names normalize to the same command value before entering the existing analysis
-branch. Check retains its separate inspection path. Without --repo the current
+branch. Check retains its separate read-only preflight path. Without --repo the current
 directory is inspected; --test is still required and repeatable.
 
 Input -> command/options -> one parser -> resolve --ai defaults -> the existing
@@ -330,3 +333,130 @@ flags for deterministic mutation testing.
 Questions: Why use argparse aliases rather than copy the command handler? Which
 model wins when --ai and --ai-model are both present? Does haunt choose tests
 automatically? (One shared route; the explicit model; no, --test remains required.)
+
+## Screening a real repository without matching its license
+
+The Boltons trial staged mathutils.py line 92 inside ceil. Investigation found
+the old file-wide regex matched `permission` in a license comment at line 17,
+outside that function. A license comment plus an ordinary changed comparison
+reproduced the same zero-mutant exclusion before edits.
+
+`mutation_is_sensitive` now uses AST parents to select the enclosing function
+(or statement outside functions) and check enclosing definition names.
+`has_sensitive_code` examines actual names and non-docstring literals in that
+scope. Comments never enter the AST; docstrings are deliberately ignored. This
+keeps permission checks protected without excluding arithmetic elsewhere because
+of a license or unrelated helper. Skip records name mutation_sensitive_path or
+mutation_sensitive_scope, never the matched value. The conservative heuristic
+is not semantic security analysis and can still reject benign code in a function
+containing executable security cues.
+
+AI's screened_source is unchanged. It may still refuse source containing
+suspected credentials even when a particular arithmetic mutation is allowed.
+The regression tests explicitly exercise this separation.
+
+Post-fix discovery found one == to != candidate at line 92. The agent's real CLI
+attempt was blocked by Git-object write permissions before baseline execution;
+no Boltons mutant executed here. Repeat in macOS Terminal from the Ghost-PR root
+using the existing interpreter with pytest:
+
+```bash
+/private/tmp/ghost-pr-dev/bin/python -m ghost_pr haunt \
+  --repo "/Users/mehul/Desktop/Personal Programs/boltons-ghost-trial" \
+  --test tests/test_mathutils.py --max-mutants 1 --json
+```
+
+This intentionally omits AI to isolate mutation discovery and execution. Check
+baseline.status, the number of mutants and each outcome. A candidate discovered
+in source alone is not an executed mutant, and exit 2 is not completed analysis.
+
+Questions: Why should a permission notice not suppress arithmetic mutations?
+Why can a permission variable inside the relevant function still block them?
+Why does permission to mutate a function not grant permission to send AI context?
+
+## Read-only preflight checks
+
+`ghost check` now reports whitespace and suspected-credential findings as well
+as existing inspection metadata. `Finding` contains only kind/rule/path/line and
+a generic message. `CheckStatus` says whether each check completed and records
+skipped coverage. Exit 0 means complete with no findings; 1 means complete with
+findings; 2 means incomplete or unsupported, even when findings also exist.
+Haunt/run exits and AI verification have not changed.
+
+Input -> copied index and temporary object store -> existing repository
+inspection -> bounded staged blob reads/diff line ranges -> whitespace and
+credential findings -> existing terminal/JSON reporting module. `git_result`
+is the shared bounded process boundary; the old `git` helper still requires exit
+zero. `inspection_snapshot` keeps even temporary tree writes outside the real
+repository. Its child-process environment changes do not alter Git configuration.
+
+`preflight.py` owns the user-facing rules. Git's whitespace checker returns 2 for
+findings; the per-path parser consumes known path-prefixed headers and discards
+their source records. Spaces, colons, newlines and Git-special filenames are
+tested. Raw Git diagnostics never become messages. Unknown formats/statuses
+make coverage incomplete. Secrets use existing zero-context changed_lines ranges
+to index captured text, never working files or removed lines.
+
+Provider rules recognize selected complete AWS/GitHub shapes and common private
+key markers. Assignment rules cover specific credential names and nontrivial
+literals, with explicit placeholder/reference exclusions. Details and limits
+(200 paths, 1 MiB per blob, 8 MiB total, strict UTF-8) are in SPEC/README.
+“Complete” describes these checks' coverage, not comprehensive secret detection.
+
+This is distinct from mutation-sensitive scope exclusions and AI's conservative
+whole-context credential withholding. Those policies have different purposes
+and intentionally retain their existing behavior. No HTTP or AI client is used
+by preflight. Keeping separate profiles avoids using AI's broad partial matches
+or file-wide withholding rules as user-facing findings.
+
+### Controlled demonstration
+
+From the Ghost-PR root with the normal environment activated:
+
+```bash
+GHOST_CHECK_DEMO="$(mktemp -d)/preflight"
+python examples/create_demo.py "$GHOST_CHECK_DEMO"
+python - "$GHOST_CHECK_DEMO" <<'PY'
+from pathlib import Path
+import sys
+root = Path(sys.argv[1])
+# Synthetic all-zero token body: not issued by a provider and never validated.
+(root / "settings.txt").write_text("note with trailing space \n" + "ghp_" + "0" * 36 + "\n")
+PY
+git -C "$GHOST_CHECK_DEMO" add -- settings.txt
+ghost check --repo "$GHOST_CHECK_DEMO"
+ghost check --repo "$GHOST_CHECK_DEMO" --json
+```
+
+Expect one trailing-whitespace finding at settings.txt:1 and one suspected GitHub
+token finding at settings.txt:2, with generic messages and exit 1. No value should
+appear in either output. The Git fixture's initial Python files are inspected,
+not executed. This is synthetic scanner data, not a real credential or live AI.
+
+Make an explicit manual edit, then stage and rerun:
+
+```bash
+python - "$GHOST_CHECK_DEMO" <<'PY'
+from pathlib import Path
+import sys
+(Path(sys.argv[1]) / "settings.txt").write_text("note without trailing space\napi_key=${API_KEY}\n")
+PY
+git -C "$GHOST_CHECK_DEMO" add -- settings.txt
+ghost check --repo "$GHOST_CHECK_DEMO"
+```
+
+Expect complete coverage, no findings and exit 0. The manual edit demonstrates a
+reference rather than a committed value; it does not prove the project is safe.
+Avoid set -e for the demonstration because exit 1 is expected on its first run.
+
+Questions: Why must a Git error differ from a finding? Why are removed values
+not scanned? Why can AI context screening still block a file that check did not
+flag? (An error leaves unknown coverage; only staged additions are the target;
+AI withholding uses a separate, more conservative policy.)
+
+Verification for this increment: 15 focused preflight tests passed; the full
+`/private/tmp/ghost-pr-dev/bin/python -m unittest discover -s tests -v` run passed
+62 tests in 20.759 seconds. The controlled demo above was rehearsed: two redacted
+findings/exit 1, then zero findings/exit 0 after manual editing and staging. File,
+index, Git-object and configuration hashes were unchanged during each check, and
+all temporary workspaces were removed. No real credential or live AI was used.

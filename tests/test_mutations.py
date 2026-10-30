@@ -9,6 +9,45 @@ from ghost_pr.mutations import discover_mutations, generate_mutant
 
 
 class MutationTests(unittest.TestCase):
+    def test_documentation_and_unrelated_sensitive_code_do_not_block_math(self):
+        source = '''"""Permission documentation, not an executable security check."""
+# Permission notice retained with this module.
+def bounded(value, limit):
+    """Authentication terminology in documentation is not code."""
+    return value <= limit
+
+def check_permission(user):
+    return user.permission == "read"
+'''
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "arithmetic.py").write_text(source)
+            mutations, skipped = discover_mutations(root, (ChangedFile("arithmetic.py", (5,)),))
+            self.assertEqual(len(mutations), 1)
+            self.assertEqual(mutations[0].after, "value < limit")
+            self.assertFalse(skipped)
+
+    def test_sensitive_paths_and_relevant_code_still_excluded(self):
+        cases = (
+            ("auth.py", "allow = True\n", 1, "mutation_sensitive_path"),
+            ("feature.py", "def authenticated():\n    return True\n", 2, "mutation_sensitive_scope"),
+            ("feature.py", "def allowed(user):\n    return user.permission == 'read'\n", 2, "mutation_sensitive_scope"),
+            ("feature.py", "def allowed(user):\n    return user['permission'] == 'read'\n", 2, "mutation_sensitive_scope"),
+            ("feature.py", "class Authentication:\n    def allowed(self):\n        return True\n", 3, "mutation_sensitive_scope"),
+            ("feature.py", "permission = True\n", 1, "mutation_sensitive_scope"),
+            ("feature.py", "def allowed(user):\n    permission = user.can_read\n    return True\n", 3, "mutation_sensitive_scope"),
+        )
+        for name, source, line, rule in cases:
+            with self.subTest(rule=rule, source=source), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                (root / name).write_text(source)
+                mutations, skipped = discover_mutations(root, (ChangedFile(name, (line,)),))
+                self.assertFalse(mutations)
+                self.assertEqual(len(skipped), 1)
+                self.assertIn(rule, skipped[0].reason)
+                self.assertNotIn("'read'", skipped[0].reason)
+                self.assertNotIn("user", skipped[0].reason)
+
     def test_one_mutation_per_original_source(self):
         source = "def f(x, y):\n    return (x <= y, x >= y, x == y, True, False)\n"
         with tempfile.TemporaryDirectory() as directory:

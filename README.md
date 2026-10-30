@@ -7,7 +7,8 @@ to five independent AST mutations on changed expressions. Optional local Ollama
 can propose a test for the first surviving mutant; Ghost-PR verifies that proposal
 against original and mutant copies. Mutation testing works without AI.
 
-**Implemented and checked:** inspection, snapshot fidelity, bounded execution,
+**Implemented and checked:** staged whitespace/narrow credential preflight,
+inspection, snapshot fidelity, bounded execution,
 mutation discovery/generation, terminal/JSON reporting, and proposed-test
 verification using recorded test fixtures. **Live example:** the team reports a
 successful qwen2.5-coder:3b distinguishing-test run in macOS Terminal; see
@@ -53,6 +54,59 @@ Repeat `--test` for multiple relative paths; pytest `::test_name` selectors are
 supported. Options, absolute
 paths and parent traversal are refused as test values.
 
+## Read-only staged checks
+
+```bash
+ghost check
+ghost check --repo /absolute/path/to/repo
+ghost check --repo /absolute/path/to/repo --json
+```
+
+Check inspects a captured index, reports Git whitespace errors and scans only
+added staged lines for suspected credentials across regular UTF-8 text files.
+It never runs tests/project code, calls AI, validates credentials with providers,
+installs tools or fixes files. Working files, index, Git objects and repository
+configuration remain unchanged; capture uses temporary index/object storage.
+
+Whitespace uses the repository's Git whitespace settings. Supported diagnostics:
+trailing whitespace, spaces before tabs in indentation, extra blank lines at EOF.
+An unsupported diagnostic or Git failure is incomplete, never a clean result.
+
+The narrow credential rules flag:
+
+- AKIA/ASIA access-key IDs with the selected complete 20-character shape.
+- Selected complete classic GitHub tokens and fine-grained token shapes.
+- Common PEM/OpenSSH private-key BEGIN markers.
+- Literal api_key, access_token, client_secret, password and passwd assignments
+  of at least 12 characters, including simple JSON/YAML/environment-file forms.
+
+Assignment rules skip environment references and explicit YOUR_*, example,
+sample, dummy, fake, test, fixture and replace placeholders. Filenames and
+comments mentioning examples/tests do not exclude a whole file. Complete provider
+token shapes and private-key markers are flagged independently of those labels.
+These are heuristic suspicions, not proof of valid credentials or harmless
+placeholders. Dynamic/multiline assignments, encoded secrets, newer stateless
+GitHub App tokens and formats not listed in [SPEC](docs/SPEC.md) can be missed.
+
+Limits: 200 changed paths, 1 MiB per old/new blob, 8 MiB cumulative blob bytes.
+Binary, undecodable and oversized content is explicitly skipped and makes coverage
+incomplete. Deleted lines and unchanged credentials are not scanned. The existing
+mixed tracked-edit, HEAD, conflict, symlink and submodule rules still apply.
+
+Terminal and JSON expose only location, rule ID and a generic redacted message.
+JSON preserves the existing inspection fields and adds findings, per-check
+completion/skipped coverage, and overall complete. Python inspection skips such
+as “not a Python file” describe mutation scope; they do not skip that text file
+from preflight. “No findings detected” is not a safety verdict.
+
+Check exits: **0** complete without findings, **1** complete with findings,
+**2** incomplete/unsupported/operational failure, taking precedence over findings.
+Mutation analysis (`haunt`/`run`) and optional AI context screening are separate;
+check data is never sent to AI. Their exit codes and screening behavior are unchanged.
+
+For a controlled whitespace/synthetic-credential demonstration, see
+[the preflight walkthrough](docs/TEAM_GUIDE.md#read-only-preflight-checks).
+
 `check` executes no project code. The target needs an existing HEAD, no conflicts,
 and no unstaged tracked changes. Stage intended changes yourself. Untracked
 files are counted and excluded; ignored files are excluded. Deleted and non-Python
@@ -84,9 +138,9 @@ equivalent, unexercised, or expose missing assertions.
 
 | Exit | Meaning |
 | --- | --- |
-| 0 | Successful inspection, or completed analysis without survivors |
-| 1 | Completed analysis with survivors |
-| 2 | Invalid input, repository/snapshot failure, blocked baseline, mutant timeout/error |
+| 0 | Complete check without findings, or completed analysis without survivors |
+| 1 | Complete check with findings, or completed analysis with survivors |
+| 2 | Incomplete/invalid check, repository/snapshot failure, blocked baseline, mutant timeout/error |
 
 Exit 2 takes precedence over survivors. AI unavailability or an unverified
 proposal does not change core exit status. A verified proposal also does not
@@ -167,7 +221,9 @@ separately managed localhost server must actually be configured to run locally.
 ## Limits and debugging
 
 - Operators: `<=` to `<`, `>=` to `>`, `==` to `!=`, Boolean flips. Tests, chained
-  comparisons, unsupported expressions and sensitive/authentication cues are skipped.
+  comparisons, unsupported expressions, sensitive paths and security cues in the
+  relevant AST code scope are skipped. Comments, docstrings and unrelated sibling
+  code do not exclude an entire file. AI credential screening is independent.
 - AST unparsing changes formatting/comments; each mutant is syntax checked.
 - Pytest plugin autoload, ambient `PYTEST_PLUGINS`, and configured `addopts` are
   disabled. Explicit project plugin configuration may still run. Integration-heavy
@@ -181,7 +237,7 @@ separately managed localhost server must actually be configured to run locally.
   a controlled fixture, run `python -m pytest test_bank.py -v` in that fixture and
   compare the reported before/after expression. Temporary run copies are not kept.
 - Large repositories are not optimized: export reads one Git blob per subprocess.
-  There are no whitespace checks, comprehensive secret scans or PR drafting.
+  Secret checks are narrow heuristics; there is no comprehensive detector or PR drafting.
 
 ## Understand and contribute
 

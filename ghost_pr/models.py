@@ -24,6 +24,31 @@ class Inspection:
 
 
 @dataclass(frozen=True)
+class Finding:
+    kind: str
+    rule_id: str
+    path: str
+    line: int
+    message: str
+
+
+@dataclass(frozen=True)
+class CheckStatus:
+    name: str
+    complete: bool
+    checked_files: int
+    skipped: tuple[SkippedFile, ...] = ()
+    message: str = ""
+
+
+@dataclass(frozen=True)
+class CheckReport:
+    inspection: Inspection
+    findings: tuple[Finding, ...]
+    checks: tuple[CheckStatus, ...]
+
+
+@dataclass(frozen=True)
 class TestRun:
     status: str
     returncode: int | None

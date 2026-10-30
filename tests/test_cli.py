@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 from ghost_pr.cli import main
-from ghost_pr.models import Inspection, Mutation, MutationResult, RunReport, TestRun
+from ghost_pr.models import CheckReport, CheckStatus, Inspection, Mutation, MutationResult, RunReport, TestRun
 
 
 class CommandTests(unittest.TestCase):
@@ -34,11 +34,13 @@ class CommandTests(unittest.TestCase):
                                                     "http://127.0.0.1:11434")
                     self.assertEqual(json.loads(output.getvalue())["baseline"]["status"], report.baseline.status)
 
-    def test_check_stays_on_inspection_path(self):
-        with patch("ghost_pr.cli.inspect_repository", return_value=self.inspection) as inspect:
+    def test_check_stays_on_preflight_path(self):
+        report = CheckReport(self.inspection, (), (CheckStatus("whitespace", True, 0),
+                                                 CheckStatus("suspected_secret", True, 0)))
+        with patch("ghost_pr.cli.check_repository", return_value=report) as check:
             with patch("ghost_pr.cli.analyze_repository") as analyze, redirect_stdout(io.StringIO()):
                 self.assertEqual(main(["check", "--json"]), 0)
-        inspect.assert_called_once_with(Path.cwd())
+        check.assert_called_once_with(Path.cwd())
         analyze.assert_not_called()
 
     def test_ai_shorthand_respects_explicit_overrides(self):
