@@ -39,12 +39,18 @@ installations that redirect imports to the original working directory.
 ```bash
 ghost check --repo /absolute/path/to/repo
 ghost check --repo /absolute/path/to/repo --json
-ghost run --repo /absolute/path/to/trusted/repo --test tests/test_example.py
-ghost run --repo /absolute/path/to/trusted/repo --test tests --timeout 10 --max-mutants 5 --json
+ghost haunt --repo /absolute/path/to/trusted/repo --test tests/test_example.py
+ghost haunt --repo /absolute/path/to/trusted/repo --test tests --timeout 10 --max-mutants 5 --json
 ```
 
-`python -m ghost_pr` is equivalent to `ghost`. Repeat `--test` for multiple
-relative paths; pytest `::test_name` selectors are supported. Options, absolute
+`python -m ghost_pr` is equivalent to `ghost`; the console entry point is
+configured as `ghost_pr.cli:main`. `haunt` is the primary execution command;
+`run` remains a compatibility alias with the same implementation and options.
+Both commands default `--repo` to the current directory. For example, inside a
+trusted target repository, use `ghost haunt --test tests`.
+
+Repeat `--test` for multiple relative paths; pytest `::test_name` selectors are
+supported. Options, absolute
 paths and parent traversal are refused as test values.
 
 `check` executes no project code. The target needs an existing HEAD, no conflicts,
@@ -52,7 +58,7 @@ and no unstaged tracked changes. Stage intended changes yourself. Untracked
 files are counted and excluded; ignored files are excluded. Deleted and non-Python
 files are reported as skipped. Renames become deletion plus addition.
 
-`run` explicitly executes trusted code in disposable directories, **not security
+`haunt` explicitly executes trusted code in disposable directories, **not security
 sandboxes**. It rejects symlinks/submodules anywhere in the exported tree. Git
 blobs preserve staged bytes and executable bits without copying working files.
 Pinning uses a temporary index copy; original files and index bytes stay unchanged.
@@ -97,7 +103,7 @@ not create commits.
 GHOST_DEMO_DIR="$(mktemp -d)/withdrawal"
 python examples/create_demo.py "$GHOST_DEMO_DIR"
 ghost check --repo "$GHOST_DEMO_DIR"
-ghost run --repo "$GHOST_DEMO_DIR" --test test_bank.py
+ghost haunt --repo "$GHOST_DEMO_DIR" --test test_bank.py
 ```
 
 Expect baseline passed, one `<= to <` survivor, exit **1**. This is expected,
@@ -110,7 +116,7 @@ Then demonstrate the missing assertion explicitly:
 ```bash
 cat examples/exact_balance_test.txt >> "$GHOST_DEMO_DIR/test_bank.py"
 git -C "$GHOST_DEMO_DIR" add -- test_bank.py
-ghost run --repo "$GHOST_DEMO_DIR" --test test_bank.py --json
+ghost haunt --repo "$GHOST_DEMO_DIR" --test test_bank.py --json
 ```
 
 Expect baseline passed with two tests, one killed mutant, detection ratio 1.0,
@@ -125,8 +131,15 @@ terminal; restart an existing server with that setting if necessary). Use
 `ollama list` to find the exact installed name; replace the placeholder below.
 No runner or model will be installed by Ghost-PR.
 
+`--ai` enables the existing integration with `qwen2.5-coder:3b` at
+`http://127.0.0.1:11434`. Use `ghost haunt --test tests --ai` inside the target
+repository. Explicit `--ai-model` and `--ai-endpoint` values override those
+defaults regardless of option order. `--ai-model` alone still enables AI;
+`--ai-endpoint` alone does not. AI stays optional when neither enabling option
+is supplied. `--show-ai-test` works with either `--ai` or `--ai-model`.
+
 ```bash
-ghost run --repo "$GHOST_DEMO_DIR" --test test_bank.py \
+ghost haunt --repo "$GHOST_DEMO_DIR" --test test_bank.py \
   --ai-model 'EXACT_INSTALLED_NAME' --ai-endpoint http://127.0.0.1:11434 \
   --json --show-ai-test
 ```
