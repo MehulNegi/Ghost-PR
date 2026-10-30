@@ -317,7 +317,7 @@ Three likely judge questions:
 
 `main` builds one execution parser: haunt, with run as its argparse alias. Both
 names normalize to the same command value before entering the existing analysis
-branch. Check retains its separate read-only preflight path. Without --repo the current
+branch. Scan retains its separate read-only preflight path. Without --repo the current
 directory is inspected; --test is still required and repeatable.
 
 Input -> command/options -> one parser -> resolve --ai defaults -> the existing
@@ -376,7 +376,7 @@ Why does permission to mutate a function not grant permission to send AI context
 
 ## Read-only preflight checks
 
-`ghost check` now reports whitespace and suspected-credential findings as well
+`ghost scan` now reports whitespace and suspected-credential findings as well
 as existing inspection metadata. `Finding` contains only kind/rule/path/line and
 a generic message. `CheckStatus` says whether each check completed and records
 skipped coverage. Exit 0 means complete with no findings; 1 means complete with
@@ -424,8 +424,8 @@ root = Path(sys.argv[1])
 (root / "settings.txt").write_text("note with trailing space \n" + "ghp_" + "0" * 36 + "\n")
 PY
 git -C "$GHOST_CHECK_DEMO" add -- settings.txt
-ghost check --repo "$GHOST_CHECK_DEMO"
-ghost check --repo "$GHOST_CHECK_DEMO" --json
+ghost scan --repo "$GHOST_CHECK_DEMO"
+ghost scan --repo "$GHOST_CHECK_DEMO" --json
 ```
 
 Expect one trailing-whitespace finding at settings.txt:1 and one suspected GitHub
@@ -442,7 +442,7 @@ import sys
 (Path(sys.argv[1]) / "settings.txt").write_text("note without trailing space\napi_key=${API_KEY}\n")
 PY
 git -C "$GHOST_CHECK_DEMO" add -- settings.txt
-ghost check --repo "$GHOST_CHECK_DEMO"
+ghost scan --repo "$GHOST_CHECK_DEMO"
 ```
 
 Expect complete coverage, no findings and exit 0. The manual edit demonstrates a
@@ -460,3 +460,20 @@ Verification for this increment: 15 focused preflight tests passed; the full
 findings/exit 1, then zero findings/exit 0 after manual editing and staging. File,
 index, Git-object and configuration hashes were unchanged during each check, and
 all temporary workspaces were removed. No real credential or live AI was used.
+
+## Primary preflight spelling: scan
+
+“Scan your changes. Haunt your tests.” Use `ghost scan` for read-only preflight.
+`ghost check` remains a compatibility alias. One argparse parser handles both
+names and normalizes them to the existing internal preflight route, including
+error handling. Internal functions such as check_repository and print_check keep
+their names; options, current-directory default, terminal output, JSON and exit
+0/1/2 are unchanged. Haunt/run routing is untouched.
+
+The same disposable fixtures compare both names for clean, findings, incomplete
+coverage and operational errors. Help checks verify --repo/--json and identical
+help output for both spellings; existing analysis tests still cover haunt/run.
+
+Questions: Why use one parser? Why keep internal function names? Do old scripts
+need migration? (Prevent option drift; avoid unnecessary refactoring; no, the
+compatibility alias preserves their behavior.)

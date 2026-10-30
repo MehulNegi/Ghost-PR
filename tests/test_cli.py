@@ -34,14 +34,30 @@ class CommandTests(unittest.TestCase):
                                                     "http://127.0.0.1:11434")
                     self.assertEqual(json.loads(output.getvalue())["baseline"]["status"], report.baseline.status)
 
-    def test_check_stays_on_preflight_path(self):
+    def test_preflight_aliases_stay_on_preflight_path(self):
         report = CheckReport(self.inspection, (), (CheckStatus("whitespace", True, 0),
                                                  CheckStatus("suspected_secret", True, 0)))
-        with patch("ghost_pr.cli.check_repository", return_value=report) as check:
-            with patch("ghost_pr.cli.analyze_repository") as analyze, redirect_stdout(io.StringIO()):
-                self.assertEqual(main(["check", "--json"]), 0)
-        check.assert_called_once_with(Path.cwd())
-        analyze.assert_not_called()
+        for command in ("scan", "check"):
+            with self.subTest(command=command):
+                with patch("ghost_pr.cli.check_repository", return_value=report) as check:
+                    with patch("ghost_pr.cli.analyze_repository") as analyze, redirect_stdout(io.StringIO()):
+                        self.assertEqual(main([command, "--json"]), 0)
+                check.assert_called_once_with(Path.cwd())
+                analyze.assert_not_called()
+
+    def test_preflight_help_is_shared(self):
+        outputs = []
+        for command in ("scan", "check"):
+            output = io.StringIO()
+            with redirect_stdout(output), self.assertRaises(SystemExit) as raised:
+                main([command, "--help"])
+            self.assertEqual(raised.exception.code, 0)
+            self.assertIn("--repo", output.getvalue())
+            self.assertIn("--json", output.getvalue())
+            self.assertNotIn("--test", output.getvalue())
+            self.assertNotIn("--ai", output.getvalue())
+            outputs.append(output.getvalue())
+        self.assertEqual(outputs[0], outputs[1])
 
     def test_ai_shorthand_respects_explicit_overrides(self):
         default_model = "qwen2.5-coder:3b"
@@ -85,4 +101,6 @@ class CommandTests(unittest.TestCase):
             main(["--help"])
         self.assertEqual(raised.exception.code, 0)
         self.assertIn("haunt (run)", output.getvalue())
+        self.assertIn("scan (check)", output.getvalue())
+        self.assertIn("Scan your changes. Haunt your tests.", output.getvalue())
         self.assertIn("compatibility alias", output.getvalue())

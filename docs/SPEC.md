@@ -5,7 +5,7 @@ Python-only, local, staged-change preflight and targeted mutation testing.
 No GitHub writes, database, automatic fixes, or model downloads.
 
 ## Increment 1: implemented
-`python -m ghost_pr check --repo PATH [--json]` inspects a Git working tree.
+`python -m ghost_pr scan --repo PATH [--json]` inspects a Git working tree.
 Exit 0 means inspection/checks completed with no findings, NOT that code is
 correct. Exit 1 means completed with findings. Exit 2 means unsupported state,
 operational failure or incomplete coverage. No code execution occurs.
@@ -53,7 +53,7 @@ parent traversal are rejected. Dependencies, including pytest, must be installed
 in the current Python interpreter. No package installation occurs. The repository
 defaults to the current directory. `ghost run` remains a compatibility alias for
 the same parser and implementation, with identical options and exit codes.
-`ghost check` remains read-only staged inspection; it does not execute tests or AI.
+`ghost scan` remains read-only preflight; it does not execute tests or AI.
 
 Options: `--timeout` positive finite seconds (default 10), `--max-mutants` 1–5
 (default 5), `--json`, optional `--ai`, `--ai-model NAME` and `--ai-endpoint URL`
@@ -363,7 +363,7 @@ credentials still block context construction after arithmetic discovery succeeds
 
 ## Read-only preflight contract
 
-`ghost check [--repo PATH] [--json]` retains inspection fields (`root`, `files`,
+`ghost scan [--repo PATH] [--json]` retains inspection fields (`root`, `files`,
 `skipped`, `untracked_count`, `tree`) and adds `findings`, `checks`, and overall
 `complete`. Finding(kind, rule_id, path, line, message) contains only safe metadata:
 kind is whitespace or suspected_secret; line is one-based new-side location;
@@ -371,6 +371,13 @@ messages never contain source or matched values. CheckStatus(name, complete,
 checked_files, skipped, message) records coverage and sanitized failures.
 Inspection's existing files/skipped fields still describe Python mutation scope;
 each check's coverage covers all eligible staged text paths, regardless of suffix.
+
+Scan is the documented primary preflight command. `ghost check` remains its
+compatibility alias, sharing the same argparse configuration and implementation.
+Both names retain --repo (current-directory default), --json, existing output
+schemas, read-only checks and exit codes. Internal functions keep their current
+names. Haunt/run routing, options, defaults and analysis behavior are unchanged.
+The tagline is “Scan your changes. Haunt your tests.”
 
 Exit 0: all checks complete, no findings. Exit 1: all complete with findings.
 Exit 2 takes precedence for incomplete checks or unsupported/operational states.
@@ -463,3 +470,28 @@ check. All run copies and the demonstration fixture were cleaned up. No tools
 were installed, no provider contacted, and no commit/push/publish of this project
 was performed. The existing fixture setup alone creates an empty initial commit
 inside its new disposable repository.
+
+## Scan command naming: acceptance checklist
+
+This is a CLI/docs change only. Normalize both preflight spellings to the existing
+internal check route, including its incomplete/error handling. Do not duplicate
+the parser, rename services or change scanners/report models.
+
+- [x] Inspect current routing/tests/docs; 6 CLI and 15 preflight tests pass before edits.
+- [x] Define the primary name, compatibility alias and unchanged contracts first.
+- [x] Add the shared parser alias and verify existing preflight tests.
+- [x] Reuse fixtures to compare both names for clean 0, findings 1, incomplete 2,
+  operational-failure 2, unchanged JSON schema and help/options.
+- [x] Update README/demo/team commands and tagline; keep old spelling only in
+  compatibility explanations.
+- [x] Run relevant tests, then full suite; review untouched haunt/run behavior.
+
+Validation: 7 CLI tests and 15 preflight tests passed. The full command
+`/private/tmp/ghost-pr-dev/bin/python -m unittest discover -s tests -v` passed
+63 tests in 21.463 seconds. Both help spellings return identical options/help.
+Real disposable-repository cases compare both names' JSON/schema and exits 0,
+1 and 2; mocked Git operational failure also returns 2 under both names without
+exposing diagnostics. Existing fixtures are reused rather than duplicated.
+All preflight/scanner/report/model code and the entire haunt/run parser/dispatch
+section are byte-for-byte unchanged. Documentation commands passed shell syntax
+checks; no features, dependencies, internal function renames or migrations added.

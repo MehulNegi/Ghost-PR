@@ -1,6 +1,6 @@
 # Ghost-PR
 
-Check staged Python changes. Test your tests. Keep the evidence local.
+Scan your changes. Haunt your tests.
 
 Ghost-PR exports an exact staged snapshot, runs a pytest baseline, and tests up
 to five independent AST mutations on changed expressions. Optional local Ollama
@@ -38,8 +38,8 @@ installations that redirect imports to the original working directory.
 ## Commands
 
 ```bash
-ghost check --repo /absolute/path/to/repo
-ghost check --repo /absolute/path/to/repo --json
+ghost scan --repo /absolute/path/to/repo
+ghost scan --repo /absolute/path/to/repo --json
 ghost haunt --repo /absolute/path/to/trusted/repo --test tests/test_example.py
 ghost haunt --repo /absolute/path/to/trusted/repo --test tests --timeout 10 --max-mutants 5 --json
 ```
@@ -56,13 +56,16 @@ paths and parent traversal are refused as test values.
 
 ## Read-only staged checks
 
+`scan` is the primary preflight command. `ghost check` remains a compatibility
+alias using the same parser, options, implementation and exit codes.
+
 ```bash
-ghost check
-ghost check --repo /absolute/path/to/repo
-ghost check --repo /absolute/path/to/repo --json
+ghost scan
+ghost scan --repo /absolute/path/to/repo
+ghost scan --repo /absolute/path/to/repo --json
 ```
 
-Check inspects a captured index, reports Git whitespace errors and scans only
+Scan inspects a captured index, reports Git whitespace errors and scans only
 added staged lines for suspected credentials across regular UTF-8 text files.
 It never runs tests/project code, calls AI, validates credentials with providers,
 installs tools or fixes files. Working files, index, Git objects and repository
@@ -99,15 +102,15 @@ completion/skipped coverage, and overall complete. Python inspection skips such
 as “not a Python file” describe mutation scope; they do not skip that text file
 from preflight. “No findings detected” is not a safety verdict.
 
-Check exits: **0** complete without findings, **1** complete with findings,
+Scan exits: **0** complete without findings, **1** complete with findings,
 **2** incomplete/unsupported/operational failure, taking precedence over findings.
 Mutation analysis (`haunt`/`run`) and optional AI context screening are separate;
-check data is never sent to AI. Their exit codes and screening behavior are unchanged.
+scan data is never sent to AI. Their exit codes and screening behavior are unchanged.
 
 For a controlled whitespace/synthetic-credential demonstration, see
 [the preflight walkthrough](docs/TEAM_GUIDE.md#read-only-preflight-checks).
 
-`check` executes no project code. The target needs an existing HEAD, no conflicts,
+`scan` executes no project code. The target needs an existing HEAD, no conflicts,
 and no unstaged tracked changes. Stage intended changes yourself. Untracked
 files are counted and excluded; ignored files are excluded. Deleted and non-Python
 files are reported as skipped. Renames become deletion plus addition.
@@ -156,7 +159,7 @@ not create commits.
 ```bash
 GHOST_DEMO_DIR="$(mktemp -d)/withdrawal"
 python examples/create_demo.py "$GHOST_DEMO_DIR"
-ghost check --repo "$GHOST_DEMO_DIR"
+ghost scan --repo "$GHOST_DEMO_DIR"
 ghost haunt --repo "$GHOST_DEMO_DIR" --test test_bank.py
 ```
 

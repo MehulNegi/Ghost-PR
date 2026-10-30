@@ -1,5 +1,7 @@
 # Three-minute Ghost-PR demonstration
 
+Scan your changes. Haunt your tests.
+
 ## Observed live validation: team report
 
 The team reported a successful run in macOS Terminal using the existing
@@ -38,7 +40,7 @@ for an original survivor is expected, even if AI verifies a proposed test.
 ```bash
 GHOST_DEMO_DIR="$(mktemp -d)/withdrawal"
 python examples/create_demo.py "$GHOST_DEMO_DIR"
-ghost check --repo "$GHOST_DEMO_DIR"
+ghost scan --repo "$GHOST_DEMO_DIR"
 ```
 
 Setup creates an empty HEAD only in this new fixture, then stages bank.py and

@@ -106,9 +106,12 @@ def analyze_repository(path: Path, paths: list[str], timeout: float = 10,
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Ghost-PR staged Python inspection and mutation analysis")
+    parser = argparse.ArgumentParser(description="Scan your changes. Haunt your tests.")
     commands = parser.add_subparsers(dest="command", required=True)
-    check = commands.add_parser("check", help="Inspect staged scope, whitespace and suspected credentials; no tests or AI")
+    check = commands.add_parser("scan", aliases=["check"],
+                                help="Inspect staged scope, whitespace and suspected credentials; no tests or AI (check is a compatibility alias)")
+    # Preserve the existing preflight dispatch and error handling for both names.
+    check.set_defaults(command="check")
     check.add_argument("--repo", type=Path, default=Path.cwd())
     check.add_argument("--json", action="store_true")
     haunt = commands.add_parser("haunt", aliases=["run"],
