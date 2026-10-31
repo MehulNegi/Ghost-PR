@@ -6,8 +6,22 @@ edits while claiming to review the staged commit would make later results false.
 We first establish a small, explicit read-only contract.
 
 ## Data flow
-Terminal arguments -> main -> inspect_repository -> bounded Git commands ->
-ChangedFile/SkippedFile records -> Inspection -> human output or JSON.
+For scan/check: terminal arguments -> main -> check_repository -> captured index
+and bounded Git commands -> Inspection plus findings and completion records ->
+human output or JSON. Haunt/run instead uses the pinned snapshot for baseline,
+mutations and optional AI verification; explicit export follows verification.
+
+`cli.parse_arguments` now owns parser construction, AI defaults and argument
+validation. It returns options to `main`, which retains command execution,
+export and exit-code decisions. This separates reading terminal options from
+running project code without moving the core workflow into another module.
+`reporting.print_command_error` handles shared JSON/stderr presentation; the CLI
+still selects sanitized messages and catches the same exception types.
+
+Review questions: Where do AI defaults resolve? In parse_arguments. Who decides
+exit 2? main, after argument validation or operational/export failure. Does the
+error formatter sanitize arbitrary exceptions? No; callers supply already-safe
+messages, and raw filesystem diagnostics remain withheld.
 
 ## How changed lines work
 `git diff --cached --unified=0` compares HEAD with the staged index, without
@@ -315,8 +329,8 @@ Three likely judge questions:
 
 ## Haunt and the compatibility alias
 
-`main` builds one execution parser: haunt, with run as its argparse alias. Both
-names normalize to the same command value before entering the existing analysis
+`parse_arguments` builds one execution parser: haunt, with run as its argparse
+alias. Both names normalize to the same command value before entering the existing analysis
 branch. Scan retains its separate read-only preflight path. Without --repo the current
 directory is inspected; --test is still required and repeatable.
 

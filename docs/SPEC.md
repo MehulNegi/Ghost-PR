@@ -1,8 +1,25 @@
 # Ghost-PR contract (v0.1)
 
 ## Product
-Python-only, local, staged-change preflight and targeted mutation testing.
+Local staged-change preflight and targeted Python mutation testing.
 No GitHub writes, database, automatic fixes, or model downloads.
+
+## Maintenance cleanup contract
+
+This cleanup changes no CLI, result, screening, execution or export contract.
+Remove only inspected Python bytecode caches; retain active untracked modules,
+tests, dynamically loaded pytest hooks and installed packaging metadata. Correct
+stale documentation without changing commands. Existing ignore rules suffice.
+Acceptance: unchanged full-suite results, shared alias help, preserved entry
+point, and no live-model calls or dependency changes.
+
+- [x] Inventory references and packaging; baseline: 76 tests passed in 27.255s.
+- [x] Remove 25 bytecode files and three empty cache directories; correct stale descriptions.
+- [x] CLI checks: 8 passed; final full suite: 76 passed in 28.117s.
+  Used `PYTHONDONTWRITEBYTECODE=1 /private/tmp/ghost-pr-dev/bin/python -B -m unittest discover -s tests -v`.
+  Alias help matches, installed entry point loads, documentation shell blocks
+  pass bash -n, and git diff --check passes. No bytecode caches remain. No
+  pre-existing test failures, runtime logic changes or live AI calls.
 
 ## Increment 1: implemented
 `python -m ghost_pr scan --repo PATH [--json]` inspects a Git working tree.
@@ -43,6 +60,30 @@ CLI -> repository service -> Git subprocess adapter.
 Domain models have no dependencies on CLI, Git, or AI.
 Mutation, execution, AI, and reporting modules depend on domain contracts.
 No command/service classes unless state or complexity justifies them.
+
+### CLI readability refactor
+
+No external contract changes. parse_arguments accepts the existing argv list
+or None, builds the same shared alias parsers, resolves AI defaults and validates
+AI-dependent flags. It returns an argparse Namespace or the same argparse
+SystemExit for help/errors; it performs no repository operations. main retains
+command orchestration, export and exit selection. Command-error presentation
+moves to reporting, taking a sanitized message and output/preflight flags:
+human errors still go to stderr, JSON errors to stdout, with complete=false
+only for preflight. Exception categories/messages and exit 2 remain unchanged.
+
+- [x] Trace existing flow and references; baseline 76 tests passed in 27.338s.
+- [x] Separate parsing from orchestration; 8 CLI tests pass and all five help
+  outputs (global plus both alias pairs) match the captured baseline exactly.
+- [x] Share command-error presentation; 9 CLI tests and 4 summary/privacy tests
+  pass. New boundary test passed before and after extraction: both alias pairs,
+  repository/filesystem errors, JSON schema, stdout/stderr and exit 2.
+- [x] Update team walkthrough; final full suite: 77 passed in 27.194s using
+  `PYTHONDONTWRITEBYTECODE=1 /private/tmp/ghost-pr-dev/bin/python -B -m unittest discover -s tests -v`.
+  All help text matches baseline, the ghost entry point loads main, and existing
+  core CLI/reporting functions have unchanged ASTs. Original index and untouched
+  source/test hashes match. No static package import cycles or unused imports
+  found; git diff --check passes. No live AI, new modules or dependencies.
 
 ## Execution contract
 

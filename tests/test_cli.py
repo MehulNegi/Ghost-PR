@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 from ghost_pr.cli import main
 from ghost_pr.models import CheckReport, CheckStatus, Inspection, Mutation, MutationResult, RunReport, TestRun
+from ghost_pr.repository import RepositoryError
 
 
 class CommandTests(unittest.TestCase):
@@ -44,6 +45,30 @@ class CommandTests(unittest.TestCase):
                         self.assertEqual(main([command, "--json"]), 0)
                 check.assert_called_once_with(Path.cwd())
                 analyze.assert_not_called()
+
+    def test_command_errors_preserve_json_and_stderr_contracts(self):
+        for command in ("scan", "check", "haunt", "run"):
+            preflight = command in ("scan", "check")
+            operation = "check_repository" if preflight else "analyze_repository"
+            arguments = [] if preflight else ["--test", "tests"]
+            filesystem_message = "Check filesystem operation failed." if preflight else "Snapshot filesystem operation failed."
+            cases = ((RepositoryError("Unsupported fixture state."), "Unsupported fixture state."),
+                     (OSError("Internal filesystem detail must not escape"), filesystem_message))
+            for error, expected in cases:
+                for options in ([], ["--json"]):
+                    with self.subTest(command=command, error=type(error).__name__, options=options):
+                        stdout, stderr = io.StringIO(), io.StringIO()
+                        with patch("ghost_pr.cli." + operation, side_effect=error), redirect_stdout(stdout), redirect_stderr(stderr):
+                            self.assertEqual(main([command, *arguments, *options]), 2)
+                        if options:
+                            data = {"error": expected}
+                            if preflight:
+                                data["complete"] = False
+                            self.assertEqual(json.loads(stdout.getvalue()), data)
+                            self.assertEqual(stderr.getvalue(), "")
+                        else:
+                            self.assertEqual(stdout.getvalue(), "")
+                            self.assertEqual(stderr.getvalue(), f"Ghost-PR: {expected}\n")
 
     def test_preflight_help_is_shared(self):
         outputs = []

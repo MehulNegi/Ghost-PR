@@ -1,7 +1,20 @@
 """Present observed results without implying code safety or business correctness."""
 from dataclasses import asdict
+import json
+import sys
 
 from .models import CheckReport, Inspection, RunReport
+
+
+def print_command_error(message: str, *, json_output: bool, preflight: bool) -> None:
+    """Render an already-sanitized message in the existing command-error format."""
+    if json_output:
+        error = {"error": message}
+        if preflight:
+            error["complete"] = False
+        print(json.dumps(error))
+    else:
+        print(f"Ghost-PR: {message}", file=sys.stderr)
 
 
 def check_data(report: CheckReport) -> dict:

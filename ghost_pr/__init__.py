@@ -1,1 +1,1 @@
-"""Ghost-PR: inspect with check, explicitly execute trusted projects with run."""
+"""Ghost-PR: scan staged changes and haunt tests in trusted project copies."""

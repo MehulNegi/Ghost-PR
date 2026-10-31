@@ -113,7 +113,8 @@ For a controlled whitespace/synthetic-credential demonstration, see
 `scan` executes no project code. The target needs an existing HEAD, no conflicts,
 and no unstaged tracked changes. Stage intended changes yourself. Untracked
 files are counted and excluded; ignored files are excluded. Deleted and non-Python
-files are reported as skipped. Renames become deletion plus addition.
+files are skipped for Python mutation scope; preflight checks added text across
+supported regular text files. Renames become deletion plus addition.
 
 `haunt` explicitly executes trusted code in disposable directories, **not security
 sandboxes**. It rejects symlinks/submodules anywhere in the exported tree. Git
@@ -283,6 +284,8 @@ separately managed localhost server must actually be configured to run locally.
 `cli.py` orchestrates; `repository.py` inspects/pins/exports; `mutations.py`
 discovers and generates; `runner.py` manages processes; `pytest_evidence.py`
 records pytest phases; `local_ai.py` screens and requests proposals;
+`preflight.py` checks staged whitespace and suspected credentials;
+`exporting.py` saves explicitly requested verified tests;
 `reporting.py` presents results; `models.py` holds immutable data.
 
 Read [the contract and checklist](docs/SPEC.md),

@@ -5,7 +5,6 @@ import json
 import math
 from pathlib import Path
 import shutil
-import sys
 import tempfile
 
 from .exporting import export_verified_test
@@ -14,7 +13,10 @@ from .models import AIResult, Mutation, MutationResult, RunReport, SkippedFile, 
 from .mutations import discover_mutations, generate_mutant, read_python
 from .preflight import check_repository
 from .repository import RepositoryError, inspect_repository, staged_snapshot
-from .reporting import analysis_data, analysis_exit_code, check_data, check_exit_code, print_analysis, print_check
+from .reporting import (
+    analysis_data, analysis_exit_code, check_data, check_exit_code,
+    print_analysis, print_check, print_command_error,
+)
 from .runner import run_tests, validate_test_paths
 
 
@@ -107,7 +109,8 @@ def analyze_repository(path: Path, paths: list[str], timeout: float = 10,
         return RunReport(inspection, baseline, results, tuple(skipped), ai)
 
 
-def main(argv: list[str] | None = None) -> int:
+def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
+    """Parse and validate command options without inspecting a repository."""
     parser = argparse.ArgumentParser(description="Scan your changes. Haunt your tests.")
     commands = parser.add_subparsers(dest="command", required=True)
     check = commands.add_parser("scan", aliases=["check"],
@@ -140,6 +143,11 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("--export-test requires --ai or --ai-model")
         if args.show_ai_test and not args.ai_model:
             parser.error("--show-ai-test requires --ai or --ai-model")
+    return args
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_arguments(argv)
     try:
         if args.command == "haunt":
             report = analyze_repository(args.repo, args.test, args.timeout, args.max_mutants,
@@ -155,23 +163,11 @@ def main(argv: list[str] | None = None) -> int:
             return analysis_exit_code(report)
         result = check_repository(args.repo)
     except (RepositoryError, ValueError) as exc:
-        if getattr(args, "json", False):
-            error = {"error": str(exc)}
-            if args.command == "check":
-                error["complete"] = False
-            print(json.dumps(error))
-        else:
-            print(f"Ghost-PR: {exc}", file=sys.stderr)
+        print_command_error(str(exc), json_output=args.json, preflight=args.command == "check")
         return 2
     except OSError:
         message = "Check filesystem operation failed." if args.command == "check" else "Snapshot filesystem operation failed."
-        if getattr(args, "json", False):
-            error = {"error": message}
-            if args.command == "check":
-                error["complete"] = False
-            print(json.dumps(error))
-        else:
-            print(f"Ghost-PR: {message}", file=sys.stderr)
+        print_command_error(message, json_output=args.json, preflight=args.command == "check")
         return 2
     if args.json:
         print(json.dumps(check_data(result), ensure_ascii=True))
