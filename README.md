@@ -266,7 +266,7 @@ Contributions should define a small contract, add meaningful verification, and e
 
 ## Credits and licence
 
-Built with OpenAI Codex in collaboration with the team. Runtime uses Python's standard library, Git, and installed pytest for test execution. Optional inference uses the user's [Ollama](https://ollama.com/) installation and [Google DeepMind Gemma 4](https://ollama.com/library/gemma4:e2b-it-q4_K_M); model licences apply separately. No weights or external application templates are bundled.
+Built with OpenAI Codex in collaboration with the team. Runtime uses Python's standard library, Git, and installed pytest for test execution. Optional inference uses the user's [Ollama](https://ollama.com/) installation and [Google DeepMind Gemma 4](https://ollama.com/library/gemma4:e2b-it-q4_K_M); model licences apply separately. [Boltons](https://github.com/mahmoud/boltons) serving as a robust, real-world Python library during our testin, validation and demonstration phases. No weights or external application templates are bundled.
 
 Ghost-PR is available under the [MIT licence](LICENSE).
 
