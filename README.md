@@ -143,10 +143,10 @@ equivalent, unexercised, or expose missing assertions.
 | --- | --- |
 | 0 | Complete check without findings, or completed analysis without survivors |
 | 1 | Complete check with findings, or completed analysis with survivors |
-| 2 | Incomplete/invalid check, repository/snapshot failure, blocked baseline, mutant timeout/error |
+| 2 | Incomplete/invalid check, repository/snapshot failure, blocked baseline, mutant timeout/error, or requested test export not performed |
 
 Exit 2 takes precedence over survivors. AI unavailability or an unverified
-proposal does not change core exit status. A verified proposal also does not
+proposal does not change core exit status unless export was requested; an unsuccessful requested export returns 2. A verified proposal also does not
 change the original survivor count: the new test has not been adopted.
 
 ## Repeatable withdrawal demo
@@ -204,14 +204,50 @@ ghost haunt --repo "$GHOST_DEMO_DIR" --test test_bank.py \
 Use a fresh fixture if the manual boundary test has already killed the mutant.
 `--ai-model` opts into requesting and executing proposed Python in disposable
 copies of a trusted project. The default omits code and explanation from output;
-`--show-ai-test` explicitly reveals a validated proposal for review. Nothing is
-written into the contributor's repository, and generated files are removed.
+`--show-ai-test` explicitly reveals a validated proposal for review. Without --export-test, nothing is written into the contributor's repository; temporary verification files are removed.
 
 Only a proposal that passes on original and produces a genuine test failure on
 mutant is labelled `verified_distinguishing_test`. Other outcomes are unverified
 with observed results. Verification demonstrates a distinction, not intended
 business requirements. Missing models, malformed responses and screened context
 leave core mutation results available.
+
+## Export a verified AI test
+
+Use a fresh withdrawal fixture with only the partial test (see setup above):
+
+```bash
+ghost haunt --repo "$GHOST_DEMO_DIR" --test test_bank.py --max-mutants 1 \
+  --ai --export-test "$GHOST_DEMO_DIR/test_boundary.py"
+# Only after the output reports exported:
+cat "$GHOST_DEMO_DIR/test_boundary.py"  # review the actual generated Python
+git -C "$GHOST_DEMO_DIR" add -- test_boundary.py
+ghost haunt --repo "$GHOST_DEMO_DIR" --test test_bank.py \
+  --test test_boundary.py --max-mutants 1
+```
+
+`--export-test` requires `--ai` or `--ai-model`; `run` supports the same option.
+Only a verified distinguishing test that passes existing proposal screening can
+be saved. Export writes exactly the verified Python, without explanations. Use
+a new `.py` path with an existing parent directory; relative paths start at the
+invocation's working directory. Existing files and symlinks are never overwritten;
+no directories are created. A failed write/close can leave a partial file, which
+must be inspected manually. Export refusal/error returns **2**, preserving actual
+analysis and AI evidence. Successful export preserves analysis exit codes: the
+original survivor still returns **1** until the reviewed test is adopted and
+staged. Verification alone does not change the detection ratio.
+
+Explicit export writes a file; analysis otherwise remains read-only. An export
+inside the target repo is initially untracked. Ghost-PR never stages or adopts
+it. Review requirements and executable code before staging. No new live-model
+success is implied by this example; the exact Terminal procedure and observed
+limitations are in [DEMO.md](docs/DEMO.md).
+
+Readable output ends with baseline, evaluated outcomes, incomplete/skipped
+coverage, AI verification, export status and the next manual action. JSON adds
+`export: {status, path, detail}`; statuses are `not_requested`, `exported`,
+`not_exported`, or `error`. It emits one JSON object, with proposed code omitted
+unless `--show-ai-test` is supplied. Export does not itself print code.
 
 The adapter follows official [chat](https://docs.ollama.com/api/chat),
 [model-list](https://docs.ollama.com/api/tags) and

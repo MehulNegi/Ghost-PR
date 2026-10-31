@@ -232,8 +232,8 @@ project. Core exit status remains based on mutation analysis. AIResult records
 status, sanitized detail, whether a model response arrived, target mutation,
 and verification outcomes. Source/test code and explanation are hidden by
 default; `--show-ai-test` explicitly includes a validated proposal in terminal
-or JSON output. It requires `--ai` or `--ai-model`. No generated file is retained or
-written into the original repo. Acceptance: recorded exact-balance success,
+or JSON output. It requires `--ai` or `--ai-model`. Without explicit --export-test,
+no generated file is retained or written into the original repo. Acceptance: recorded exact-balance success,
 original failure, mutant survival, unavailable model and malformed response;
 original files and index remain unchanged.
 
@@ -470,6 +470,82 @@ check. All run copies and the demonstration fixture were cleaned up. No tools
 were installed, no provider contacted, and no commit/push/publish of this project
 was performed. The existing fixture setup alone creates an empty initial commit
 inside its new disposable repository.
+
+## Explicit verified-test export and readable summary
+
+Interface: `ghost haunt --test tests --ai --export-test PATH`, also available via
+the same run alias. --export-test requires --ai or existing explicit --ai-model
+enablement; argument misuse exits 2 before analysis. Existing analysis, mutation,
+proposal validation and two-direction verification semantics remain unchanged.
+
+ExportResult(status, path, detail) is added as RunReport.export. Status is one of
+not_requested, exported, not_exported or error. Path is absolute/resolved where
+applicable; detail is a safe message without code, explanation or raw context.
+JSON retains all existing fields and meanings, adding only this result. Proposal
+code/explanation remains omitted unless --show-ai-test is present. JSON stdout
+is one object; the readable summary is never appended to it.
+
+Export accepts only ai.status == verified_distinguishing_test with a retained
+proposal. Reapply existing validate_proposal checks to establish current screening
+without regeneration or another test run; write the original proposal.test_code
+string exactly. Refuse unavailable/invalid/unverified/missing/unsafe proposals.
+The existing AI sensitive-content rules are reused, not the public preflight
+scanner or a new credential detector.
+
+Resolve relative paths against invocation cwd. Resolve parent components only,
+so an existing final-component symlink is never dereferenced. Require .py and an
+existing parent directory; create no parents. Open with exclusive text creation,
+UTF-8 and no newline translation. Never use a target exists() check as permission
+to write. Existing regular files, directories and symlinks (including dangling
+links) remain untouched. Report exported only after write and context-manager
+close both succeed. Expected filesystem errors produce safe metadata; programming
+errors propagate. On a write/close failure a new incomplete file may remain:
+report error and require manual inspection/new output name, never claim success.
+
+This is an explicitly authorized file write after otherwise read-only analysis.
+It never stages, commits, adopts or reruns the proposed test automatically. A new
+file inside the target repo is untracked until the contributor reviews/stages it.
+No persistent response cache or automatic retry is introduced. A later invocation
+requests a fresh proposal; export saves the verified code from that same run.
+
+CLI return code: preserve analysis 0/1/2 on export success or no export request.
+Any requested export yielding not_exported/error overrides it to 2 while keeping
+the actual baseline, mutants and AI results in the report. A survivor still means
+exit 1 after a successful export. analysis_exit_code continues to describe core
+analysis only; export outcome is separate. Fatal inspection errors before any
+RunReport retain the existing error contract; no synthetic analysis is invented.
+
+Readable summary is derived only from RunReport: baseline status, killed/survived
+evaluated counts, excluded timeout/error counts and recorded skips when present,
+AI request/verification state, export outcome and a relevant manual next step.
+Handle baseline failure, zero mutants, all evaluated mutants killed, survivors,
+AI unavailable/unverified, verified without export, export failure and incomplete
+runs. It must not change the existing ratio, equate survivors with bugs, imply
+adoption, claim safety/business correctness or ask AI to summarize results.
+
+Acceptance/progress:
+
+- [x] 1: inspect current flow; 63 tests pass before edits; define contracts first.
+- [x] 2: small exclusive-write helper, exact contents/symlink/failure/screening tests.
+- [x] 3: shared haunt/run --export-test routing, preserved results/privacy/exit tests.
+- [x] 4: short result-derived summaries and scenario checks.
+- [x] 5: README/DEMO/team guide, real local-model attempt or exact Terminal fallback,
+  integrated full suite and final scoped review. Recorded fixtures are never live evidence.
+
+Validation (2026-10-31): export helper 5 tests, CLI 8 tests, AI workflow and
+verification 5 tests, summary/privacy 4 tests passed in focused runs. Final
+`/private/tmp/ghost-pr-dev/bin/python -m unittest discover -s tests -v` passed
+76 tests in 27.000 seconds. Integration tests use recorded model fixtures with
+real Git, pytest and exclusive filesystem writes; they confirm source/index
+preservation, only the requested untracked export, and no remaining run copies.
+Live attempt: baseline 1 passed, boundary mutant survived; localhost blocked
+(PermissionError errno 1), AI unavailable, export not_exported, exit 2. Runtime
+0.564 seconds; no file exported, originals/index unchanged and cleanup complete.
+This is not a new successful live generation/export claim. See DEMO.md for the
+macOS Terminal procedure. Mutation engine, runner, AI adapter and existing
+verification functions were compared against pre-change backups and unchanged.
+README/DEMO shell blocks passed bash -n; git diff --check passed. No dependencies,
+automatic adoption, retries, commits or pushes added.
 
 ## Scan command naming: acceptance checklist
 

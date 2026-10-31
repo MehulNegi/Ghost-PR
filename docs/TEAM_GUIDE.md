@@ -477,3 +477,50 @@ help output for both spellings; existing analysis tests still cover haunt/run.
 Questions: Why use one parser? Why keep internal function names? Do old scripts
 need migration? (Prevent option drift; avoid unnecessary refactoring; no, the
 compatibility alias preserves their behavior.)
+
+
+## Verified-test export and end-of-run summary
+
+Input → existing analysis/AI verification → retained proposal → existing response
+screening → exclusive UTF-8 file creation → export result → readable summary.
+No mutation discovery, test execution or verification rule changes. Export never
+asks the model again and never changes the detection ratio. The summary uses
+recorded outcomes, not model prose. JSON receives metadata, not extra prose.
+
+- CLI teammate: haunt/run share --export-test; require AI first, then preserve
+  analysis evidence while returning 2 if requested export fails.
+- Repository/mutation teammate: snapshots and independent mutation copies stay
+  unchanged. Only explicit export can create a new file in the target repo; its
+  index remains untouched and the file starts untracked.
+- Runner/AI teammate: verification still requires original pass plus genuine
+  mutant test failure. Existing validation is reapplied before exporting the
+  exact retained code. It is not a security sandbox or proof of requirements.
+- Reporting teammate: ExportResult has status/path/detail. Default JSON omits
+  proposals. The readable summary reports baseline, counts, exclusions, AI,
+  export and a relevant manual next step without claiming adoption.
+
+The writer lives in exporting.py because exclusive filesystem output is a real
+responsibility separate from formatting. It resolves parents, not the final
+symlink; open('x') prevents overwrites. No parent directory is created. Late
+write/close failure can leave an incomplete new file: report error and inspect
+it manually. Successful writes preserve exact text, including line endings.
+
+Run `ghost haunt --test tests --ai --export-test /existing/parent/test_new.py`.
+See DEMO.md for the fresh withdrawal setup and manual review/staging/rerun.
+Automated recorded fixtures verify export integration; the new real-model
+attempt was blocked by localhost permissions and is documented separately.
+
+Questions and answers:
+1. Why can export succeed while exit is 1? The existing tests still missed the
+   mutant; the proposed test has not yet been adopted.
+2. Why not just check whether a path exists before writing? Another process could
+   create it afterward; exclusive creation refuses files and dangling symlinks.
+3. Does verified mean safe or correct requirements? No. It records a test pass
+   on original and test failure on mutant; a person must review and adopt it.
+
+Verified by: focused export (5), CLI (8), AI workflow/verification (5), and
+summary/privacy (4) tests; final unittest discover run **76 passed in 27.000s**.
+The real-model attempt had a passing baseline and surviving boundary mutant,
+but localhost permissions blocked AI; no file was exported. Source/index bytes
+and cleanup were checked. See DEMO.md for precise observed results and Terminal
+commands. No new successful live export is claimed.

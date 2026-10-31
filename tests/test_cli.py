@@ -95,6 +95,14 @@ class CommandTests(unittest.TestCase):
                     main([command])
                 self.assertEqual(raised.exception.code, 2)
 
+    def test_export_requires_ai_before_analysis(self):
+        for command in ("haunt", "run"):
+            with patch("ghost_pr.cli.analyze_repository") as analyze, redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit) as raised:
+                    main([command, "--test", "tests", "--export-test", "test_new.py"])
+                self.assertEqual(raised.exception.code, 2)
+                analyze.assert_not_called()
+
     def test_help_lists_primary_command_and_alias(self):
         output = io.StringIO()
         with redirect_stdout(output), self.assertRaises(SystemExit) as raised:

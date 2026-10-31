@@ -93,9 +93,17 @@ class AIResult:
 
 
 @dataclass(frozen=True)
+class ExportResult:
+    status: str = "not_requested"
+    path: str | None = None
+    detail: str = "No test export requested."
+
+
+@dataclass(frozen=True)
 class RunReport:
     inspection: Inspection
     baseline: TestRun
     mutants: tuple[MutationResult, ...]
     skipped: tuple[SkippedFile, ...]
     ai: AIResult = field(default_factory=AIResult)
+    export: ExportResult = field(default_factory=ExportResult)

@@ -73,6 +73,48 @@ def print_inspection(inspection: Inspection) -> None:
     print("No project code or AI executed.")
 
 
+def analysis_summary(report: RunReport) -> list[str]:
+    counts = outcome_counts(report)
+    lines = [f"Summary: baseline {report.baseline.status}; {counts['killed']} killed, {counts['survived']} survived."]
+    if counts["timeout"] or counts["execution_error"]:
+        lines.append(f"Excluded outcomes: {counts['timeout']} timeout(s), {counts['execution_error']} execution error(s).")
+    if report.skipped or report.inspection.untracked_count:
+        lines.append(f"Skipped coverage: {len(report.skipped)} recorded skip(s), {report.inspection.untracked_count} untracked file(s).")
+    if report.baseline.status == "passed" and not report.mutants:
+        lines.append("No mutants were evaluated; this provides no mutation-detection evidence.")
+    if report.ai.status == "verified_distinguishing_test":
+        lines.append("AI proposal verified: its test passed on the original and failed on the mutant.")
+    elif report.ai.status == "not_requested":
+        lines.append("AI was not requested.")
+    else:
+        lines.append(f"AI was requested; no verified proposal ({report.ai.status}).")
+    export = report.export
+    if export.status == "exported":
+        lines.append(f"Verified test exported to {ascii(export.path)}.")
+    elif export.status == "not_requested":
+        lines.append("Test export was not requested.")
+    else:
+        lines.append(f"Test export {export.status}: {export.detail}")
+    if report.baseline.status != "passed":
+        next_action = "Resolve the baseline outcome before mutation analysis."
+    elif counts["timeout"] or counts["execution_error"]:
+        next_action = "Resolve incomplete execution outcomes and rerun analysis."
+    elif export.status == "error":
+        next_action = "Inspect the export failure and any partial file; retry with an unused writable .py path."
+    elif export.status == "exported":
+        next_action = "Review the saved test before adopting and staging it; then rerun analysis."
+    elif report.ai.status == "verified_distinguishing_test":
+        next_action = "Review the proposed test; request --export-test on a new AI run to save a verified proposal."
+    elif counts["survived"]:
+        next_action = "Review surviving mutations and AI outcomes, if requested; add a relevant test and rerun."
+    elif not report.mutants:
+        next_action = "Review staged scope and skip reasons before drawing conclusions."
+    else:
+        next_action = "All evaluated mutants were killed; review detailed evidence and skipped scope."
+    lines.append(f"Next: {next_action}")
+    return lines
+
+
 def print_analysis(report: RunReport, show_ai_test: bool = False) -> None:
     counts = outcome_counts(report)
     denominator = counts["killed"] + counts["survived"]
@@ -101,3 +143,4 @@ def print_analysis(report: RunReport, show_ai_test: bool = False) -> None:
         for line in report.ai.proposal.test_code.splitlines():
             print(f"    {ascii(line)}")
     print("Survivors may be equivalent, outside exercised paths, or reveal missing assertions.")
+    print("\n" + "\n".join(analysis_summary(report)))

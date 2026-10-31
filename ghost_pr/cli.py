@@ -1,5 +1,6 @@
 """Parse commands and orchestrate inspection, independent runs and optional AI."""
 import argparse
+from dataclasses import replace
 import json
 import math
 from pathlib import Path
@@ -7,6 +8,7 @@ import shutil
 import sys
 import tempfile
 
+from .exporting import export_verified_test
 from .local_ai import AIError, build_context, request_proposal, validate_proposal
 from .models import AIResult, Mutation, MutationResult, RunReport, SkippedFile, TestProposal, TestRun
 from .mutations import discover_mutations, generate_mutant, read_python
@@ -128,20 +130,28 @@ def main(argv: list[str] | None = None) -> int:
     haunt.add_argument("--ai-endpoint", default="http://127.0.0.1:11434",
                        help="Local Ollama URL (default: http://127.0.0.1:11434; overrides --ai endpoint)")
     haunt.add_argument("--show-ai-test", action="store_true", help="Explicitly display validated proposed code and explanation")
+    haunt.add_argument("--export-test", type=Path,
+                       help="Exclusively write a verified AI test to a new .py file; requires AI")
     args = parser.parse_args(argv)
     if args.command == "haunt":
         if args.ai and args.ai_model is None:
             args.ai_model = "qwen2.5-coder:3b"
+        if args.export_test is not None and not args.ai_model:
+            parser.error("--export-test requires --ai or --ai-model")
         if args.show_ai_test and not args.ai_model:
             parser.error("--show-ai-test requires --ai or --ai-model")
     try:
         if args.command == "haunt":
             report = analyze_repository(args.repo, args.test, args.timeout, args.max_mutants,
                                         args.ai_model, args.ai_endpoint)
+            if args.export_test is not None:
+                report = replace(report, export=export_verified_test(report.ai, args.export_test))
             if args.json:
                 print(json.dumps(analysis_data(report, args.show_ai_test), ensure_ascii=True))
             else:
                 print_analysis(report, args.show_ai_test)
+            if args.export_test is not None and report.export.status != "exported":
+                return 2
             return analysis_exit_code(report)
         result = check_repository(args.repo)
     except (RepositoryError, ValueError) as exc:

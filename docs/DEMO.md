@@ -65,7 +65,7 @@ loopback endpoint; explicit model/endpoint options remain available:
 
 ```bash
 ghost haunt --repo "$GHOST_DEMO_DIR" --test test_bank.py --max-mutants 1 \
-  --ai --show-ai-test
+  --ai --export-test "$GHOST_DEMO_DIR/test_boundary.py"
 ```
 
 The model receives the actual function, before/after mutation expressions and
@@ -78,11 +78,12 @@ Show the actual status. If generation fails or the test passes on both, show
 that outcome honestly. A successful proposal leaves the original survivor count
 and exit 1 unchanged: the contributor has not adopted it yet.
 
-Terminal code is displayed as escaped lines. For exact multiline source and
-verification counts, choose the existing `--json --show-ai-test` output instead
-of the readable command, saving it outside the target repository. Read the
-decoded `ai.proposal.test_code`, `ai.original` and `ai.mutant` fields. Do not
-paste JSON escapes or the terminal's surrounding representation quotes as code.
+Export occurs only after verification and existing screening. It writes exactly
+the verified Python to this new file, without adopting or staging it. A survivor
+still returns exit 1 after successful export. If export is refused or fails,
+exit is 2: inspect the AI/export status, and do not proceed as though a file was
+saved. Existing paths (including symlinks) are never overwritten. The parent
+must already exist. Do not use --show-ai-test unless code should also be printed.
 
 ## 2:00–3:00 — Manually review, adopt, stage and rerun
 
@@ -92,24 +93,24 @@ intended result? Check for replacement/mocked targets, unrelated actions and
 whether the expected behavior makes sense. A verified distinction alone does
 not establish the intended requirements.
 
-Open a new test file and manually paste only the reviewed generated Python:
+Review the exported file, then explicitly adopt it by staging:
 
 ```bash
-nano "$GHOST_DEMO_DIR/test_generated_boundary.py"
-git -C "$GHOST_DEMO_DIR" add -- test_generated_boundary.py
-git -C "$GHOST_DEMO_DIR" diff --cached -- test_generated_boundary.py
+cat "$GHOST_DEMO_DIR/test_boundary.py"
+git -C "$GHOST_DEMO_DIR" add -- test_boundary.py
+git -C "$GHOST_DEMO_DIR" diff --cached -- test_boundary.py
 ghost haunt --repo "$GHOST_DEMO_DIR" --test test_bank.py \
-  --test test_generated_boundary.py --max-mutants 1
+  --test test_boundary.py --max-mutants 1
 ```
 
-This edit is the contributor's explicit adoption, not an automatic Ghost-PR
-write. Do not append `examples/exact_balance_test.txt` or substitute canned test
+Staging is the contributor's explicit adoption. Export alone does not adopt
+the test. Do not append `examples/exact_balance_test.txt` or substitute canned test
 code. Leave bank.py staged against the empty HEAD; do not commit during this
 sequence, or the changed-line scope will disappear.
 
 For the reported distinguishing test, expect baseline passed with two tests,
 one killed mutant, no excluded outcomes, ratio 1/1, exit 0. Claim these outcomes
-only after observing the rerun. If the copied test is invalid or ineffective,
+only after observing the rerun. If the reviewed test is invalid or ineffective,
 inspect the actual error/result before presenting success. This adoption rerun
 is a documented procedure; it was not supplied as evidence with the live report.
 
@@ -162,3 +163,33 @@ using the same interpreter/command above. In a fresh deterministic fixture:
 This rerun used no AI. Its manual assertion is deterministic fixture material,
 separate from the team's live model-generated test recorded above. CLI tests
 also verify --ai defaults, explicit overrides, and preserved test selection.
+
+## Export implementation validation (2026-10-31)
+
+The coding agent attempted the real workflow in a fresh fixture using --ai
+(qwen2.5-coder:3b) and --export-test, without recorded responses or the prepared
+boundary test. Observed: baseline **1 passed**, **1 survived**, **0 killed**;
+AI **unavailable**, response_received false; export **not_exported**, exit **2**.
+Elapsed wall time: **0.564 seconds**, including baseline and mutant execution.
+A separate loopback /api/tags probe returned PermissionError, errno 1: this
+coding environment blocks localhost. This is not evidence that the team's
+Ollama service or model is broken. No proposal was generated or exported here.
+The source files and raw index bytes were unchanged; the dedicated temporary
+workspace parent was empty after execution. The entire fixture was removed.
+
+Run the commands above in macOS Terminal with the README environment activated
+to validate real generation/export. They invoke the existing adapter and model;
+there is no canned response, new adapter or automatic model download. Continue
+to review/stage only after observing verified_distinguishing_test and exported.
+A killed mutant after adoption must also be observed, not assumed.
+
+Automated integration evidence for export: the final full suite command above
+passed **76 tests in 27.000 seconds**. Five export tests exercise exact UTF-8
+contents, relative paths, screening/refusal, existing files/symlinks, missing
+parents and a late-I/O failure. Shared haunt/run integration uses explicitly
+recorded responses with real Git and pytest, confirms original pass/mutant test
+failure, export success with survivor exit 1, export refusal/failure exit 2,
+untracked output, unchanged originals/index, and empty temporary workspaces.
+Summary/privacy tests check that default terminal/JSON output hides proposal
+code and describes actual recorded outcomes. These tests do not substitute for
+a new real-model run. Mutation and verification semantics remain unchanged.
