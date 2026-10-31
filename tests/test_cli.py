@@ -85,9 +85,10 @@ class CommandTests(unittest.TestCase):
         self.assertEqual(outputs[0], outputs[1])
 
     def test_ai_shorthand_respects_explicit_overrides(self):
-        default_model = "qwen2.5-coder:3b"
+        default_model = "gemma4:e2b-it-q4_K_M"
         default_endpoint = "http://127.0.0.1:11434"
         custom_endpoint = "http://localhost:12000"
+        previous_model = "qwen2.5-coder:3b"
         cases = (
             (["--ai"], default_model, default_endpoint),
             (["--ai", "--show-ai-test"], default_model, default_endpoint),
@@ -97,6 +98,9 @@ class CommandTests(unittest.TestCase):
             (["--ai", "--ai-endpoint", custom_endpoint], default_model, custom_endpoint),
             (["--ai-endpoint", custom_endpoint], None, custom_endpoint),
             (["--ai", "--ai-model", "other:tag", "--ai-endpoint", custom_endpoint], "other:tag", custom_endpoint),
+            (["--ai-model", previous_model], previous_model, default_endpoint),
+            (["--ai", "--ai-model", previous_model], previous_model, default_endpoint),
+            (["--ai-model", previous_model, "--ai"], previous_model, default_endpoint),
         )
         for command in ("haunt", "run"):
             for options, model, endpoint in cases:
@@ -112,6 +116,18 @@ class CommandTests(unittest.TestCase):
                 with self.assertRaises(SystemExit) as raised:
                     main([command, "--test", "tests", "--show-ai-test"])
                 self.assertEqual(raised.exception.code, 2)
+
+    def test_execution_help_shares_gemma_default_and_endpoint(self):
+        outputs = []
+        for command in ("haunt", "run"):
+            output = io.StringIO()
+            with redirect_stdout(output), self.assertRaises(SystemExit) as raised:
+                main([command, "--help"])
+            self.assertEqual(raised.exception.code, 0)
+            self.assertIn("gemma4:e2b-it-q4_K_M", output.getvalue())
+            self.assertIn("http://127.0.0.1:11434", output.getvalue())
+            outputs.append(output.getvalue())
+        self.assertEqual(outputs[0], outputs[1])
 
     def test_test_selection_is_still_required(self):
         for command in ("haunt", "run"):

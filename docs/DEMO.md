@@ -2,7 +2,31 @@
 
 Scan your changes. Haunt your tests.
 
-## Observed live validation: team report
+## Observed Gemma 4 validation: team report
+
+The team reported live success with **gemma4:e2b-it-q4_K_M**:
+
+| Recorded result | Reported observation |
+| --- | --- |
+| AI status | verified_distinguishing_test |
+| Proposed test on original | 1 passed, 0 errors |
+| Proposed test on mutant | 1 failed, 0 errors |
+
+This records the team's real local run, not a new coding-agent inference or a
+recorded test fixture. The generated source, runtime, runner version and exact
+run timestamp were not supplied; none are invented. It demonstrates this test
+on this original/mutant pair, not a general success rate or business correctness.
+Each future proposal must still pass validation and two-direction verification.
+The shared --ai default now selects this exact Gemma 4 tag.
+
+Default-change validation by the coding agent: 10 CLI tests passed, including
+both aliases, help, endpoint/default selection and explicit overrides. The full
+suite passed 80 tests in 27.162s. A direct parser check confirms --ai selects
+Gemma without --ai-model. The adapter/schema, mutation, verification, export and
+summary source stayed unchanged. These automated checks are separate evidence
+from the team's live result above; no new inference or model download was run.
+
+## Earlier Qwen validation: team report
 
 The team reported a successful run in macOS Terminal using the existing
 Ghost-PR integration and **qwen2.5-coder:3b** after the prompt correction:
@@ -35,6 +59,9 @@ for an original survivor is expected, even if AI verifies a proposed test.
 
 ## 0:00–0:30 — Show actual staged scope
 
+The walkthrough uses the current Gemma 4 default. The earlier Qwen observations
+above remain separate historical evidence.
+
 “Do our tests detect a small change to code we're about to contribute?”
 
 ```bash
@@ -60,7 +87,7 @@ each test run uses a fresh copy. The contributor's source and index stay intact.
 ## 1:00–2:00 — Request and verify a real local proposal
 
 Use readable output, with no `--json`. `haunt` is the primary command;
-`run` is a compatibility alias. `--ai` selects qwen2.5-coder:3b at the default
+`run` is a compatibility alias. `--ai` selects gemma4:e2b-it-q4_K_M at the default
 loopback endpoint; explicit model/endpoint options remain available:
 
 ```bash
@@ -163,6 +190,54 @@ using the same interpreter/command above. In a fresh deterministic fixture:
 This rerun used no AI. Its manual assertion is deterministic fixture material,
 separate from the team's live model-generated test recorded above. CLI tests
 also verify --ai defaults, explicit overrides, and preserved test selection.
+
+## Gemma 4 formatting history and default-selection check
+
+The team reported gemma4:e2b-it-q4_K_M returning response_received=true,
+status=invalid_response and detail="Proposed test is not valid JSON." No proposal
+reached test verification. Raw response content and the installed runner version
+were not provided; malformed-content cause is unconfirmed. Do not infer that
+thinking caused this from status alone. The later successful live result is
+recorded above; success does not retrospectively identify the earlier cause.
+
+The existing adapter now sends a format schema requiring string explanation and
+test_code fields with no extra properties, instead of JSON mode alone. It still
+reads the documented message.content field and strictly validates the entire
+answer. message.thinking is not a fallback. Thinking settings and generation
+limits are unchanged; model-specific controls require evidence and support.
+No automatic retry, fragment extraction or prepared test has been added.
+
+To check the new default without --ai-model, activate the README environment
+in macOS Terminal and run from the project root. `ghost haunt --help` also shows
+the selected default tag and endpoint:
+
+```bash
+GHOST_GEMMA4_DEMO_DIR="$(mktemp -d)/withdrawal"
+python examples/create_demo.py "$GHOST_GEMMA4_DEMO_DIR"
+ghost haunt --repo "$GHOST_GEMMA4_DEMO_DIR" --test test_bank.py \
+  --max-mutants 1 --ai --json
+```
+
+Use the already-installed model, with only the initial partial-withdrawal test.
+Do not append the prepared exact-balance test. Report actual ai.status,
+response_received and original/mutant outcomes, not raw output or source.
+Success still requires verified_distinguishing_test with original passed and
+mutant failed through a genuine test failure; baseline must pass and the initial
+mutant must survive. JSON parsing alone is not verification. Exit 1 remains
+expected for that original survivor. Gemma 4 is now the shared --ai default.
+
+The team reported the successful Gemma run above. The coding environment's
+previous localhost restriction is separate; no new local inference was run to
+change this constant. Automated protocol fixtures do not replace real generation.
+If a future response is invalid, keep it unverified. Safe follow-up
+evidence includes Ollama version and non-content metadata such as done_reason,
+whether content is empty and whether a separate thinking field is present;
+these are not currently emitted by Ghost-PR. Do not publish raw responses.
+
+Automated validation of this change: 8 adapter tests and 5 AI workflow/verification
+tests passed; the full suite passed 79 tests in 27.475s. Tests cover the schema
+request, content/thinking separation and strict refusal of malformed answers.
+Synthetic protocol fixtures do not establish successful live Gemma generation.
 
 ## Export implementation validation (2026-10-31)
 

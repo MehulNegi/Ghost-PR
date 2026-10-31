@@ -11,7 +11,7 @@ against original and mutant copies. Mutation testing works without AI.
 inspection, snapshot fidelity, bounded execution,
 mutation discovery/generation, terminal/JSON reporting, and proposed-test
 verification using recorded test fixtures. **Live example:** the team reports a
-successful qwen2.5-coder:3b distinguishing-test run in macOS Terminal; see
+successful gemma4:e2b-it-q4_K_M distinguishing-test run in macOS Terminal; see
 [the observed result and its limits](docs/DEMO.md). This is not a general model
 reliability claim. Recorded responses are used only in automated tests.
 
@@ -189,12 +189,38 @@ terminal; restart an existing server with that setting if necessary). Use
 `ollama list` to find the exact installed name; replace the placeholder below.
 No runner or model will be installed by Ghost-PR.
 
-`--ai` enables the existing integration with `qwen2.5-coder:3b` at
+`--ai` enables the existing integration with `gemma4:e2b-it-q4_K_M` at
 `http://127.0.0.1:11434`. Use `ghost haunt --test tests --ai` inside the target
 repository. Explicit `--ai-model` and `--ai-endpoint` values override those
 defaults regardless of option order. `--ai-model` alone still enables AI;
 `--ai-endpoint` alone does not. AI stays optional when neither enabling option
 is supplied. `--show-ai-test` works with either `--ai` or `--ai-model`.
+
+The default is **Google DeepMind Gemma 4**, exact Ollama tag
+**gemma4:e2b-it-q4_K_M**. Check installation first; only download manually if
+missing and you choose to install it. Ghost-PR never pulls weights itself:
+
+```bash
+ollama list
+# Only if the exact tag is missing:
+ollama pull gemma4:e2b-it-q4_K_M
+```
+
+The team reported one live verified distinguishing test: original **1 passed,
+0 errors**; mutant **1 failed, 0 errors**. This establishes that particular run,
+not general reliability. See [the observed Gemma result](docs/DEMO.md#observed-gemma-4-validation-team-report)
+and the fresh `--ai` demo below. One DEFAULT_AI_MODEL constant supplies help and
+selection; explicit overrides and the localhost endpoint remain unchanged.
+The adapter requests a two-string-field schema and strictly validates the entire
+message.content; no thinking fallback, JSON-fragment extraction or automatic retries.
+
+With a fresh withdrawal fixture, check the default without a model override:
+
+```bash
+ghost haunt --repo "$GHOST_DEMO_DIR" --test test_bank.py --max-mutants 1 --ai --json
+```
+
+To select another already-installed model explicitly:
 
 ```bash
 ghost haunt --repo "$GHOST_DEMO_DIR" --test test_bank.py \
@@ -300,4 +326,7 @@ Developed with OpenAI Codex in collaboration with the team. Runtime uses Python'
 standard library, Git and installed pytest for target execution. Optional local
 inference uses the user's Ollama installation and chosen model; model licences
 remain their own. No model weights or external application templates are bundled.
+Google DeepMind provides the default Gemma 4 model; its model licence is linked
+from [the official Ollama model page](https://ollama.com/library/gemma4:e2b-it-q4_K_M).
+Live Gemma and earlier Qwen results are recorded separately in DEMO.md.
 The team must review and understand generated code. MIT; see [LICENSE](LICENSE).

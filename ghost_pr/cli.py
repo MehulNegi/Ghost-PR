@@ -20,6 +20,9 @@ from .reporting import (
 from .runner import run_tests, validate_test_paths
 
 
+DEFAULT_AI_MODEL = "gemma4:e2b-it-q4_K_M"
+
+
 def run_snapshot_tests(snapshot: Path, paths: list[str], timeout: float,
                        mutation: Mutation | None = None,
                        proposed_test: str | None = None) -> TestRun:
@@ -128,7 +131,7 @@ def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
     haunt.add_argument("--max-mutants", type=int, choices=range(1, 6), default=5)
     haunt.add_argument("--json", action="store_true")
     haunt.add_argument("--ai", action="store_true",
-                       help="Enable local AI with qwen2.5-coder:3b at http://127.0.0.1:11434")
+                       help=f"Enable local AI with {DEFAULT_AI_MODEL} at http://127.0.0.1:11434")
     haunt.add_argument("--ai-model", help="Enable AI with an installed Ollama model (overrides --ai model)")
     haunt.add_argument("--ai-endpoint", default="http://127.0.0.1:11434",
                        help="Local Ollama URL (default: http://127.0.0.1:11434; overrides --ai endpoint)")
@@ -138,7 +141,7 @@ def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
     args = parser.parse_args(argv)
     if args.command == "haunt":
         if args.ai and args.ai_model is None:
-            args.ai_model = "qwen2.5-coder:3b"
+            args.ai_model = DEFAULT_AI_MODEL
         if args.export_test is not None and not args.ai_model:
             parser.error("--export-test requires --ai or --ai-model")
         if args.show_ai_test and not args.ai_model:

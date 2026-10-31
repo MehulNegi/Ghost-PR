@@ -50,10 +50,37 @@ Inspection(root: str, files: tuple[ChangedFile, ...], skipped: tuple[SkippedFile
 
 Increments 1–4 are implemented and exercised with controlled repositories.
 Increment 5 is exercised with recorded HTTP/proposal fixtures. The team also
-reports a successful live qwen2.5-coder:3b distinguishing-test run in macOS
-Terminal; provenance and limits are recorded in DEMO.md. This is an observed
+reports a successful live gemma4:e2b-it-q4_K_M distinguishing-test run;
+provenance, limits and earlier Qwen records are in DEMO.md. This is an observed
 example, not a general model reliability claim.
 Execution always uses disposable copies, which are not security sandboxes.
+
+### Gemma 4 default after reported live validation
+
+--ai selects gemma4:e2b-it-q4_K_M from the existing cli.DEFAULT_AI_MODEL
+constant, shared with help text. Explicit --ai-model values still override it
+regardless of option order; --ai-model alone still enables AI. The localhost
+endpoint remains http://127.0.0.1:11434, with existing explicit endpoint overrides.
+No mutation, schema-validation, verification, export, summary or exit-code change.
+Missing models are reported; no model is downloaded automatically.
+
+The team reported live success with gemma4:e2b-it-q4_K_M:
+ai.status=verified_distinguishing_test; original: 1 passed, 0 errors;
+mutant: 1 failed, 0 errors. This report satisfies the default-switch gate for
+this demonstrated case. It is not a new inference run by the coding agent or a
+claim of general reliability. Runtime, runner version and generated code were
+not supplied for this result; none are invented. Earlier Qwen runs and the
+Gemma formatting failure remain historical evidence in DEMO.md.
+
+- [x] Inspect current state; baseline 79 tests passed in 27.257s.
+- [x] Change only the shared default; 10 CLI tests pass for aliases, help and overrides.
+- [x] Remove stale candidate setup, update model credits and record live result.
+- [x] Full suite: 80 passed in 27.162s using
+  `PYTHONDONTWRITEBYTECODE=1 /private/tmp/ghost-pr-dev/bin/python -B -m unittest discover -s tests -v`.
+  Protected source/test and original index hashes match the pre-change capture;
+  all CLI function ASTs are unchanged (only the default constant value changed).
+  Documentation shell snippets and git diff --check pass. No live AI request,
+  model download, commit or push was performed for this default change.
 
 ## Architecture
 CLI -> repository service -> Git subprocess adapter.
@@ -98,7 +125,7 @@ the same parser and implementation, with identical options and exit codes.
 
 Options: `--timeout` positive finite seconds (default 10), `--max-mutants` 1–5
 (default 5), `--json`, optional `--ai`, `--ai-model NAME` and `--ai-endpoint URL`
-(default `http://127.0.0.1:11434`). `--ai` enables AI using qwen2.5-coder:3b
+(default `http://127.0.0.1:11434`). `--ai` enables AI using gemma4:e2b-it-q4_K_M
 unless `--ai-model` is explicitly supplied. An explicit endpoint overrides the
 default independently. `--ai-model` alone continues to enable AI; endpoint alone
 does not. Option order does not affect this precedence. `--show-ai-test` requires
@@ -188,7 +215,7 @@ Official Ollama chat/tags API checked before implementation (2026-10-31):
 https://docs.ollama.com/api/chat and https://docs.ollama.com/api/tags.
 Use GET `/api/tags`, require the exact installed model name, positive model size,
 GGUF format and no cloud/remote metadata; then POST `/api/chat` with
-`stream: false`, `format: "json"`, and system/user messages. HTTP loopback roots
+`stream: false`, a proposal JSON schema in `format`, and system/user messages. HTTP loopback roots
 only; localhost is mapped to 127.0.0.1. No proxy or redirect handling. HTTP and
 JSON failures become sanitized AI errors, leaving core results usable.
 Run the already-installed Ollama server with `OLLAMA_NO_CLOUD=1`; the client
@@ -199,6 +226,49 @@ transport failure, remote endpoint refusal, oversized and malformed responses.
 Live access was unavailable in the agent environment during adapter development;
 the team subsequently reported success from macOS Terminal (DEMO.md). The agent
 has not downloaded a model.
+
+#### Gemma 4 structured-response correction
+
+The team reported gemma4:e2b-it-q4_K_M returning response_received=true,
+invalid_response and "Proposed test is not valid JSON." No proposal reached
+verification. This confirms JSON parsing failed, not the cause of the malformed
+content. The previous request used JSON mode without a schema. It already read
+the documented /api/chat answer field, message.content; thinking is separate.
+
+Contract: the same request_proposal inputs produce the same raw answer string
+or sanitized AIError. Send an object schema requiring explanation and test_code
+as strings, with additionalProperties=false, in format. Ground the existing
+instruction with that same schema. Keep stream=false, limits, temperature,
+token budget, localhost checks and model selection unchanged. Accept only a
+completed chat response with string message.content; never substitute thinking
+or a generate endpoint's response field. validate_proposal continues to parse
+the entire content and apply all existing shape, size, syntax and privacy checks.
+Do not unwrap markdown, extract braces, retry or invent a proposal. No changes
+to mutation, verification, export, result models, statuses or exit codes.
+
+Official guidance checked 2026-10-31:
+[structured outputs](https://docs.ollama.com/capabilities/structured-outputs),
+[thinking](https://docs.ollama.com/capabilities/thinking), and
+[chat](https://docs.ollama.com/api/chat). Thinking defaults/controls vary by
+model and can be discovered through /api/show. Do not set think without evidence
+of need and installed-model support. No such evidence was supplied for this run;
+leave thinking behavior unchanged. Qwen was retained at that stage; after the
+subsequent reported live success, the current default is Gemma 4 as defined above.
+
+- [x] Inspect implementation/docs and baseline: 77 passed in 27.676s.
+- [x] Request schema using the existing adapter; 6 existing adapter tests pass,
+  with an updated payload check for required string fields/no extra properties.
+- [x] Cover separate thinking/content and strict refusal: 8 adapter tests and
+  5 AI workflow/verification tests pass. Final full suite: 79 passed in 27.475s
+  using `PYTHONDONTWRITEBYTECODE=1 /private/tmp/ghost-pr-dev/bin/python -B -m unittest discover -s tests -v`.
+  Existing HTTP/context/validation and original/mutant verification functions
+  have unchanged ASTs. README/DEMO shell snippets and git diff --check pass.
+- [x] Document exact Terminal retry and evidence limits without raw responses.
+
+The correction's tests alone did not establish live Gemma success. The team
+subsequently reported success, recorded above. Tests use labelled synthetic
+protocol responses, not a captured live response. No raw model output,
+repository context, thinking trace or credential is added to runtime reporting.
 
 ### Proposal validation contract (R)
 

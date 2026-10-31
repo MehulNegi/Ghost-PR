@@ -77,7 +77,14 @@ class AdapterTests(unittest.TestCase):
             self.assertEqual(request_proposal("http://localhost:11434", "demo:latest", context), '{"recorded": true}')
         payload = request.call_args.args[2]
         self.assertFalse(payload["stream"])
-        self.assertEqual(payload["format"], "json")
+        self.assertEqual(payload["format"], {
+            "type": "object",
+            "properties": {"explanation": {"type": "string"}, "test_code": {"type": "string"}},
+            "required": ["explanation", "test_code"],
+            "additionalProperties": False,
+        })
+        self.assertIn(json.dumps(payload["format"]), payload["messages"][0]["content"])
+        self.assertNotIn("think", payload)
         self.assertEqual(payload["model"], "demo:latest")
         self.assertEqual(payload["messages"][0]["role"], "system")
         self.assertEqual(payload["messages"][1]["role"], "user")
@@ -115,3 +122,32 @@ class AdapterTests(unittest.TestCase):
             factory.return_value.request.side_effect = ConnectionRefusedError()
             with self.assertRaisesRegex(AIError, "unavailable"):
                 request_json("http://localhost", "/api/tags")
+
+    def test_chat_uses_only_content_and_keeps_strict_json_validation(self):
+        valid = json.dumps({"explanation": "Recorded final answer", "test_code": "def test_fixture(): assert True\n"})
+        thinking = json.dumps({"explanation": "Recorded reasoning only", "test_code": "def test_reasoning(): assert False\n"})
+        cases = (("valid", valid), ("empty", ""), ("markdown", "```json\n" + valid + "\n```"),
+                 ("prose", "Proposed answer: " + valid))
+        for label, content in cases:
+            response = {"done": True, "message": {"content": content, "thinking": thinking}}
+            with self.subTest(case=label), patch("ghost_pr.local_ai.request_json", side_effect=[LOCAL_MODEL, response]):
+                raw = request_proposal("http://localhost", "demo:latest", {})
+                self.assertEqual(raw, content)
+                if label == "valid":
+                    self.assertEqual(validate_proposal(raw).explanation, "Recorded final answer")
+                else:
+                    with self.assertRaisesRegex(AIError, "not valid JSON"):
+                        validate_proposal(raw)
+
+    def test_chat_requires_completed_content_not_thinking_or_generate_field(self):
+        valid = json.dumps({"explanation": "Recorded fixture", "test_code": "def test_fixture(): assert True\n"})
+        cases = (
+            {"done": False, "message": {"content": valid}},
+            {"done": True, "message": {"thinking": valid}},
+            {"done": True, "message": {"content": None, "thinking": valid}},
+            {"done": True, "response": valid},
+        )
+        for index, response in enumerate(cases):
+            with self.subTest(case=index), patch("ghost_pr.local_ai.request_json", side_effect=[LOCAL_MODEL, response]):
+                with self.assertRaisesRegex(AIError, "no completed test proposal"):
+                    request_proposal("http://localhost", "demo:latest", {})

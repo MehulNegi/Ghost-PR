@@ -125,6 +125,21 @@ execution_error excluded from the denominator? When does exit 2 override exit 1?
 
 ## Optional local AI and verification
 
+The adapter requests a JSON schema in format: an object with required string
+explanation/test_code fields and no extras. One PROPOSAL_SCHEMA constant also
+grounds the prompt. The documented final chat answer is message.content;
+message.thinking stays separate and is never parsed as a fallback proposal.
+Existing strict validation still rejects empty, markdown-wrapped or prose-prefixed
+answers, invalid Python and suspected credentials before test execution. The
+reported Gemma 4 parsing failure does not establish why the content was malformed;
+thinking controls remain unchanged pending evidence of need and model support.
+See DEMO.md for the --ai default check and reported Gemma 4 success. The shared
+default now selects gemma4:e2b-it-q4_K_M; explicit model overrides still work.
+
+Review questions: Does a schema replace validation? No. Can reasoning substitute
+for missing content? No. What proves a distinguishing test? A real original pass
+and genuine mutant test failure, after proposal validation.
+
 `build_context` reads the pristine snapshot, finds the enclosing function, and
 selects small test excerpts. It refuses sensitive paths, suspected credentials
 and oversized context before a request. `request_proposal` checks the installed
@@ -322,7 +337,8 @@ Three likely judge questions:
    the generated test, stage it, and rerun both test paths. A newly observed killed
    result then changes the report. Exit 2 takes precedence for operational errors.
 3. **What does the successful live demo establish?** The team observed a
-   distinguishing test from qwen2.5-coder:3b for this fixture. It does not establish
+   distinguishing test from gemma4:e2b-it-q4_K_M, with original 1 passed/0 errors
+   and mutant 1 failed/0 errors. It does not establish
    general model reliability or business requirements. The detection ratio is
    killed/(killed+survived), excluding timeout/error, with N/A for zero denominator;
    it is never a safety score.
@@ -336,7 +352,7 @@ directory is inspected; --test is still required and repeatable.
 
 Input -> command/options -> one parser -> resolve --ai defaults -> the existing
 `analyze_repository` call -> unchanged reporting and exit codes. --ai selects
-qwen2.5-coder:3b at http://127.0.0.1:11434; explicit model/endpoint values win.
+gemma4:e2b-it-q4_K_M at http://127.0.0.1:11434; explicit model/endpoint values win.
 An explicit --ai-model still enables AI alone. No mutation or verification logic
 changed. The existing pyproject console entry point remains ghost_pr.cli:main.
 
@@ -347,6 +363,15 @@ flags for deterministic mutation testing.
 Questions: Why use argparse aliases rather than copy the command handler? Which
 model wins when --ai and --ai-model are both present? Does haunt choose tests
 automatically? (One shared route; the explicit model; no, --test remains required.)
+
+The current tag is held once in cli.DEFAULT_AI_MODEL and reused by help and
+--ai resolution. It now selects Google DeepMind Gemma 4 after the team's reported
+verified_distinguishing_test: original 1 passed/0 errors, mutant 1 failed/0 errors.
+This is one observed case, not a general reliability claim. Explicit --ai-model
+values still win in either option order, including the former Qwen default.
+CLI tests check routing/help; they do not substitute for real generation. The
+adapter, schema, verifier, export, summaries and exits are unchanged by this
+model-selection change. No automatic model downloads are involved.
 
 ## Screening a real repository without matching its license
 
