@@ -125,6 +125,22 @@ initial capture; later edits do not change the pinned run.
 
 ## Reading results
 
+Readable output uses separate Scan/Haunt sections, blank lines and two-space
+indentation. Status symbols accompany words: ✓ success/detected mutation,
+✗ finding/failure, ! warning, – skipped, • information. Skips for Python mutation
+selection are distinct from preflight coverage and do not exclude tests from
+execution. Incomplete checks are explicit; zero candidates are not strong-test
+evidence. AI verification/export does not change the original suite before adoption.
+
+There is no colour or ANSI styling, including redirected output and NO_COLOR
+environments. Encodings that cannot represent symbols (or unknown encodings)
+use PASS/FAIL/INFO and ASCII separators. Untrusted paths/messages use ASCII
+escapes for controls and non-ASCII characters. Fonts may still lack glyphs even
+with UTF-8; encoding detection cannot establish visual glyph width/availability.
+`--json` bypasses readable formatting and retains its existing schema. Proposed
+code remains hidden unless --show-ai-test is requested; exports preserve exact
+verified contents. See [controlled output examples](docs/DEMO.md#readable-output-examples).
+
 A baseline must pass and execute tests before any mutation runs. Failures,
 collection/setup/teardown errors, timeouts, and empty or entirely skipped runs
 block analysis. Each mutant starts from the original snapshot in a fresh copy.
@@ -270,8 +286,8 @@ it. Review requirements and executable code before staging. No new live-model
 success is implied by this example; the exact Terminal procedure and observed
 limitations are in [DEMO.md](docs/DEMO.md).
 
-Readable output ends with baseline, evaluated outcomes, incomplete/skipped
-coverage, AI verification, export status and the next manual action. JSON adds
+Readable sections show baseline, evaluated outcomes, incomplete/skipped coverage,
+AI verification and export status once, ending with caveats and the next manual action. JSON adds
 `export: {status, path, detail}`; statuses are `not_requested`, `exported`,
 `not_exported`, or `error`. It emits one JSON object, with proposed code omitted
 unless `--show-ai-test` is supplied. Export does not itself print code.

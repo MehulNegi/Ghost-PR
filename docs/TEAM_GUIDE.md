@@ -109,6 +109,22 @@ Why can a multiline expression start before its changed line?
 
 ## Analysis and reports
 
+Readable presentation stays in reporting.py. print_check separates inspection,
+findings and preflight completion; print_analysis separates baseline, mutations,
+scope, AI and export. analysis_summary now supplies closing caveats and a next
+action without repeating the evidence. Existing JSON/count/exit helpers are unchanged.
+
+terminal_text escapes untrusted display text; print_readable chooses fixed
+Unicode symbols or ASCII status words using stdout's encoding. No colour/ANSI,
+terminal framework or configuration is involved. These helpers format text only:
+they never alter results, run tests, call AI or write exported code. JSON bypasses
+them; --show-ai-test remains the explicit code-display gate. Unknown encodings
+use ASCII; UTF-8 support does not guarantee a font has every glyph.
+
+Review questions: Is a killed mutant a failure? No, the tests detected the change.
+Does skipping a test file for mutation skip its execution? No. Does verified AI
+improve the original ratio? No, review/adoption and another run are still required.
+
 `analyze_repository` inspects and exports once, tests a disposable baseline copy,
 and stops unless tests pass. Discovery returns sorted candidates; the first five
 each run in their own fresh copy. `run_mutant_tests` maps actual test failures to
@@ -535,8 +551,8 @@ recorded outcomes, not model prose. JSON receives metadata, not extra prose.
   mutant test failure. Existing validation is reapplied before exporting the
   exact retained code. It is not a security sandbox or proof of requirements.
 - Reporting teammate: ExportResult has status/path/detail. Default JSON omits
-  proposals. The readable summary reports baseline, counts, exclusions, AI,
-  export and a relevant manual next step without claiming adoption.
+  proposals. Readable sections report baseline, counts, exclusions, AI and export;
+  closing guidance gives the manual next step without repeating evidence or claiming adoption.
 
 The writer lives in exporting.py because exclusive filesystem output is a real
 responsibility separate from formatting. It resolves parents, not the final

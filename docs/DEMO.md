@@ -2,6 +2,81 @@
 
 Scan your changes. Haunt your tests.
 
+## Readable output examples
+
+These excerpts were captured from real controlled CLI runs with UTF-8 stdout;
+path lists and repeated coverage details are omitted here for space. No live AI
+was called. The scan fixture was the fresh withdrawal repository plus staged
+sample.py with trailing whitespace and credential.txt with a synthetic,
+nonfunctional all-zero GitHub-token body. The value never appeared in output.
+
+```text
+Ghost-PR · Scan
+Scan your changes. Haunt your tests.
+
+✓ Inspection completed
+  Python scope: 3 file(s)
+  Untracked excluded: 0
+
+✗ Whitespace · 1 finding(s)
+  sample.py:1
+    [git_trailing_whitespace] Trailing whitespace.
+
+✗ Suspected secrets · 1 finding(s)
+  credential.txt:1
+    [github_token] Suspected GitHub token; value redacted.
+
+✓ 2 checks completed
+  whitespace: complete · 4 file(s) checked
+    Completed.
+  suspected_secret: complete · 4 file(s) checked
+    Completed.
+
+Result: 2 finding(s) · exit 1
+These checks are not a safety verdict.
+No project code or AI executed.
+```
+
+The haunt run used a separate fresh withdrawal fixture with only the initial
+partial test; exit was 1. It reported one neutral test-file mutation skip while
+still executing that test. The original suite missed the boundary mutant:
+
+```text
+Ghost-PR · Haunt
+
+✓ Baseline · passed · 1 passed, 0 failed, 0 errors
+  Snapshot: 67114b27a2aa
+
+! Mutation results · 0 killed, 1 survived
+  Mutants attempted: 1
+  Timeouts: 0 · Execution errors: 0
+  Detection ratio: 0/1; timeouts and execution errors excluded.
+  ! bank.py:5:8 · SURVIVED
+    amount <= balance → amount < balance (<= to <)
+
+• AI not requested
+
+• Test export not requested
+
+Mutation results are not an overall safety verdict.
+Survivors are not automatically confirmed bugs; they may be equivalent or outside exercised paths.
+Next: Review surviving mutations and AI outcomes, if requested; add a relevant test and rerun.
+```
+
+Both runs preserved original file/index hashes, left no temporary run copies,
+and their disposable fixture parent was removed. Redirected UTF-8 output has
+symbols but no ANSI styling. ASCII/unknown encodings use PASS/FAIL/INFO, plain
+separators and '-' for skip markers. Untrusted names/messages are escaped even
+on UTF-8 terminals; encoding support does not guarantee font glyph support.
+The full snapshot ID remains available in JSON. Detailed evidence appears once
+in readable sections; closing guidance does not imply automatic test adoption.
+
+Validation for this presentation change: 8 reporting, 15 preflight, 5 analysis,
+10 CLI and 5 AI workflow/verification tests passed in focused runs. The final
+full suite passed **84 tests in 28.818s**. Real-Git tests compare readable output
+for scan/check and haunt/run, and existing JSON/privacy/export tests remain green.
+Encoding tests use redirected UTF-8 and ASCII streams; no ANSI escapes are emitted.
+
 ## Observed Gemma 4 validation: team report
 
 The team reported live success with **gemma4:e2b-it-q4_K_M**:

@@ -6,6 +6,23 @@ import sys
 from .models import CheckReport, Inspection, RunReport
 
 
+def terminal_text(value: str) -> str:
+    """Keep untrusted text on one line, escaping control and non-ASCII characters."""
+    return ascii(value)[1:-1]
+
+
+def print_readable(text: str = "") -> None:
+    """Use plain status words if stdout cannot encode our fixed symbols."""
+    encoding = getattr(sys.stdout, "encoding", None) or "ascii"
+    try:
+        text.encode(encoding)
+    except UnicodeEncodeError:
+        for symbol, plain in (("✓", "PASS"), ("✗", "FAIL"), ("–", "-"),
+                              ("•", "INFO"), ("·", "|"), ("→", "->")):
+            text = text.replace(symbol, plain)
+    print(text)
+
+
 def print_command_error(message: str, *, json_output: bool, preflight: bool) -> None:
     """Render an already-sanitized message in the existing command-error format."""
     if json_output:
@@ -14,7 +31,7 @@ def print_command_error(message: str, *, json_output: bool, preflight: bool) -> 
             error["complete"] = False
         print(json.dumps(error))
     else:
-        print(f"Ghost-PR: {message}", file=sys.stderr)
+        print(f"Ghost-PR: {terminal_text(message)}", file=sys.stderr)
 
 
 def check_data(report: CheckReport) -> dict:
@@ -30,26 +47,37 @@ def check_exit_code(report: CheckReport) -> int:
 
 
 def print_check(report: CheckReport) -> None:
+    print_readable("Ghost-PR · Scan\nScan your changes. Haunt your tests.\n")
     print_inspection(report.inspection)
-    for kind, title in (("whitespace", "Whitespace findings"), ("suspected_secret", "Suspected-secret findings")):
-        print(f"{title}:")
+    states = {check.name: check for check in report.checks}
+    for kind, title in (("whitespace", "Whitespace"), ("suspected_secret", "Suspected secrets")):
         findings = [finding for finding in report.findings if finding.kind == kind]
+        complete = states[kind].complete
+        symbol = "✗" if findings else "✓" if complete else "!"
+        print_readable(f"\n{symbol} {title} · {len(findings)} finding(s)")
+        if not complete:
+            print_readable("  Check incomplete; coverage is missing.")
         for finding in findings:
-            print(f"  {ascii(finding.path)}:{finding.line} [{finding.rule_id}] {finding.message}")
+            print_readable(f"  {terminal_text(finding.path)}:{finding.line}")
+            print_readable(f"    [{terminal_text(finding.rule_id)}] {terminal_text(finding.message)}")
         if not findings:
-            print("  None detected in checked text.")
-    print("Check completion and skipped coverage:")
+            print_readable("  None detected in checked text.")
+    code = check_exit_code(report)
+    print_readable("\n! Checks incomplete" if code == 2 else f"\n✓ {len(report.checks)} checks completed")
     for check in report.checks:
         state = "complete" if check.complete else "incomplete"
-        print(f"  {check.name}: {state}; {check.checked_files} file(s). {check.message}")
+        print_readable(f"  {terminal_text(check.name)}: {state} · {check.checked_files} file(s) checked")
+        if check.message:
+            print_readable(f"    {terminal_text(check.message)}")
         for skipped in check.skipped:
-            print(f"    SKIPPED {ascii(skipped.path)}: {skipped.reason}")
-    if check_exit_code(report) == 2:
-        print("Result: incomplete; required coverage is missing.")
+            print_readable(f"    – Preflight skipped {terminal_text(skipped.path)}: {terminal_text(skipped.reason)}")
+    if code == 2:
+        print_readable(f"\nResult: incomplete · {len(report.findings)} finding(s) recorded · exit 2")
     elif report.findings:
-        print(f"Result: {len(report.findings)} finding(s) detected.")
+        print_readable(f"\nResult: {len(report.findings)} finding(s) · exit 1")
     else:
-        print("Result: no findings detected by these checks; this is not a safety verdict.")
+        print_readable("\nResult: no findings detected · exit 0")
+    print_readable("These checks are not a safety verdict.\nNo project code or AI executed.")
 
 
 def outcome_counts(report: RunReport) -> dict[str, int]:
@@ -77,37 +105,25 @@ def analysis_data(report: RunReport, show_ai_test: bool = False) -> dict:
 
 
 def print_inspection(inspection: Inspection) -> None:
-    print("Ghost-PR | staged scope inspection (not a code-safety verdict)")
+    print_readable("✓ Inspection completed")
+    print_readable(f"  Python scope: {len(inspection.files)} file(s)")
+    print_readable(f"  Untracked excluded: {inspection.untracked_count}")
     for item in inspection.files:
-        print(f"  {ascii(item.path)}: changed lines {', '.join(map(str, item.lines))}")
-    for item in inspection.skipped:
-        print(f"  PYTHON-SCOPE SKIP {ascii(item.path)}: {item.reason}")
-    print(f"Python inspection scope: {len(inspection.files)} file(s). Untracked excluded: {inspection.untracked_count}.")
-    print("No project code or AI executed.")
+        print_readable(f"  {terminal_text(item.path)}: changed lines {', '.join(map(str, item.lines))}")
+    if inspection.skipped:
+        print_readable(f"  Python-scope exclusions: {len(inspection.skipped)} record(s); separate from preflight coverage")
+        for item in inspection.skipped:
+            print_readable(f"    – Skipped {terminal_text(item.path)}: {terminal_text(item.reason)}")
 
 
 def analysis_summary(report: RunReport) -> list[str]:
     counts = outcome_counts(report)
-    lines = [f"Summary: baseline {report.baseline.status}; {counts['killed']} killed, {counts['survived']} survived."]
-    if counts["timeout"] or counts["execution_error"]:
-        lines.append(f"Excluded outcomes: {counts['timeout']} timeout(s), {counts['execution_error']} execution error(s).")
-    if report.skipped or report.inspection.untracked_count:
-        lines.append(f"Skipped coverage: {len(report.skipped)} recorded skip(s), {report.inspection.untracked_count} untracked file(s).")
-    if report.baseline.status == "passed" and not report.mutants:
-        lines.append("No mutants were evaluated; this provides no mutation-detection evidence.")
-    if report.ai.status == "verified_distinguishing_test":
-        lines.append("AI proposal verified: its test passed on the original and failed on the mutant.")
-    elif report.ai.status == "not_requested":
-        lines.append("AI was not requested.")
-    else:
-        lines.append(f"AI was requested; no verified proposal ({report.ai.status}).")
     export = report.export
-    if export.status == "exported":
-        lines.append(f"Verified test exported to {ascii(export.path)}.")
-    elif export.status == "not_requested":
-        lines.append("Test export was not requested.")
-    else:
-        lines.append(f"Test export {export.status}: {export.detail}")
+    lines = ["Mutation results are not an overall safety verdict."]
+    if counts["survived"]:
+        lines.append("Survivors are not automatically confirmed bugs; they may be equivalent or outside exercised paths.")
+    if report.ai.status == "verified_distinguishing_test":
+        lines.append("AI verification and export have not changed the original suite; adoption and rerunning are still required.")
     if report.baseline.status != "passed":
         next_action = "Resolve the baseline outcome before mutation analysis."
     elif counts["timeout"] or counts["execution_error"]:
@@ -132,28 +148,70 @@ def print_analysis(report: RunReport, show_ai_test: bool = False) -> None:
     counts = outcome_counts(report)
     denominator = counts["killed"] + counts["survived"]
     ratio = f"{counts['killed']}/{denominator}" if denominator else "N/A"
-    print("Ghost-PR | staged mutation analysis")
-    print(f"Pinned tree: {report.inspection.tree}")
-    print(f"Baseline: {report.baseline.status} (passed={report.baseline.passed}, failed={report.baseline.failed}, errors={report.baseline.errors})")
-    if report.baseline.status != "passed":
-        print("Mutation testing blocked by baseline outcome.")
-    print(f"Mutants attempted: {len(report.mutants)}")
-    print("  " + ", ".join(f"{name}={value}" for name, value in counts.items()))
-    print(f"Detection ratio: {ratio}; timeouts and execution errors excluded.")
+    print_readable("Ghost-PR · Haunt\n")
+    baseline = report.baseline
+    symbol = "✓" if baseline.status == "passed" else "✗" if baseline.status == "failed" else "!"
+    print_readable(f"{symbol} Baseline · {terminal_text(baseline.status)} · {baseline.passed} passed, {baseline.failed} failed, {baseline.errors} errors")
+    print_readable(f"  Snapshot: {terminal_text(report.inspection.tree[:12])}")
+    if baseline.status != "passed":
+        print_readable("  Stop: mutation testing blocked by baseline outcome.")
+    print_readable()
+    if baseline.status != "passed":
+        print_readable("• Mutation results · not run")
+    elif not report.mutants:
+        print_readable("• No supported mutation candidates")
+        print_readable("  No mutants were evaluated; this provides no mutation-detection evidence.")
+    else:
+        symbol = "!" if counts["survived"] or counts["timeout"] or counts["execution_error"] else "✓"
+        print_readable(f"{symbol} Mutation results · {counts['killed']} killed, {counts['survived']} survived")
+    print_readable(f"  Mutants attempted: {len(report.mutants)}")
+    print_readable(f"  Timeouts: {counts['timeout']} · Execution errors: {counts['execution_error']}")
+    print_readable(f"  Detection ratio: {ratio}; timeouts and execution errors excluded.")
     for result in report.mutants:
         mutation = result.mutation
-        print(f"  {result.outcome}: {ascii(mutation.path)}:{mutation.line}:{mutation.column + 1} ({mutation.operator})")
-        print(f"    {ascii(mutation.before)} -> {ascii(mutation.after)}")
-    for item in report.skipped:
-        print(f"  SKIPPED {ascii(item.path)}: {item.reason}")
-    print(f"Untracked files excluded: {report.inspection.untracked_count}")
-    print(f"AI: {report.ai.status}; model response received: {report.ai.response_received}")
-    if report.ai.detail:
-        print(f"  {report.ai.detail}")
-    if show_ai_test and report.ai.proposal is not None:
-        print(f"  Explanation: {ascii(report.ai.proposal.explanation)}")
-        print("  Proposed code (escaped lines):")
-        for line in report.ai.proposal.test_code.splitlines():
-            print(f"    {ascii(line)}")
-    print("Survivors may be equivalent, outside exercised paths, or reveal missing assertions.")
-    print("\n" + "\n".join(analysis_summary(report)))
+        symbol = "✓" if result.outcome == "killed" else "!"
+        print_readable(f"  {symbol} {terminal_text(mutation.path)}:{mutation.line}:{mutation.column + 1} · {terminal_text(result.outcome.upper())}")
+        print_readable(f"    {terminal_text(mutation.before)} → {terminal_text(mutation.after)} ({terminal_text(mutation.operator)})")
+    print_readable(f"\n• Mutation scope · {len(report.inspection.files)} Python file(s)")
+    print_readable(f"  Untracked excluded: {report.inspection.untracked_count}")
+    if report.skipped:
+        paths = {item.path for item in report.skipped}
+        print_readable(f"  {len(report.skipped)} skip record(s) across {len(paths)} path(s)")
+        print_readable("  Mutation skips do not exclude files from test execution.")
+        for item in report.skipped:
+            print_readable(f"  – Skipped {terminal_text(item.path)}: {terminal_text(item.reason)}")
+    ai = report.ai
+    print_readable()
+    if ai.status == "verified_distinguishing_test":
+        print_readable("✓ AI proposal verified")
+        print_readable("  Passed on original · Failed on mutant")
+    elif ai.status == "not_requested":
+        print_readable("• AI not requested")
+    elif ai.status == "not_needed":
+        print_readable("• AI requested · no surviving mutation")
+    else:
+        print_readable(f"! AI proposal not verified · {terminal_text(ai.status)}")
+    if ai.status != "not_requested":
+        print_readable(f"  Model response received: {ai.response_received}")
+    if ai.detail:
+        print_readable(f"  {terminal_text(ai.detail)}")
+    for label, tests in (("Original", ai.original), ("Mutant", ai.mutant)):
+        if tests is not None:
+            print_readable(f"  {label}: {terminal_text(tests.status)} · {tests.passed} passed, {tests.failed} failed, {tests.errors} errors")
+    if show_ai_test and ai.proposal is not None:
+        print_readable(f"  Explanation: {terminal_text(ai.proposal.explanation)}")
+        print_readable("  Proposed code (escaped lines):")
+        for line in ai.proposal.test_code.splitlines():
+            print_readable(f"    {terminal_text(line)}")
+    export = report.export
+    print_readable()
+    if export.status == "exported":
+        print_readable("✓ Verified test exported")
+    elif export.status == "not_requested":
+        print_readable("• Test export not requested")
+    else:
+        print_readable(f"✗ Test export not performed · {terminal_text(export.status)}")
+        print_readable(f"  {terminal_text(export.detail)}")
+    if export.path is not None:
+        print_readable(f"  {terminal_text(export.path)}")
+    print_readable("\n" + "\n".join(analysis_summary(report)))

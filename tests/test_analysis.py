@@ -50,9 +50,14 @@ class AnalysisTests(GitFixture):
             with redirect_stdout(output):
                 code = main(["run", "--repo", str(self.root), "--test", "test_feature.py"])
             self.assertEqual(code, expected, output.getvalue())
-            self.assertIn("Baseline:", output.getvalue())
+            self.assertIn("Baseline", output.getvalue())
             self.assertIn("Detection ratio:", output.getvalue())
-            self.assertIn("AI: not_requested", output.getvalue())
+            self.assertIn("AI not requested", output.getvalue())
+            alias_output = io.StringIO()
+            with redirect_stdout(alias_output):
+                alias_code = main(["haunt", "--repo", str(self.root), "--test", "test_feature.py"])
+            self.assertEqual(alias_code, expected)
+            self.assertEqual(alias_output.getvalue(), output.getvalue())
 
     def test_cap_independence_and_original_preservation(self):
         source = "def flags():\n    return [True, True, True, True, True, True]\n"

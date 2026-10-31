@@ -88,6 +88,55 @@ Domain models have no dependencies on CLI, Git, or AI.
 Mutation, execution, AI, and reporting modules depend on domain contracts.
 No command/service classes unless state or complexity justifies them.
 
+### Readable terminal presentation
+
+Inputs remain CheckReport/RunReport; output is readable text only. Keep JSON
+serializers/schema, core results, execution and CLI exit selection unchanged.
+Use Scan/Haunt headings, blank lines and two-space indentation levels. Symbols
+always accompany words: success, finding/failure, warning, skipped or information.
+No colour/ANSI, animations, dependencies or new terminal configuration.
+
+Scan separates Python inspection scope from preflight checked/skipped coverage.
+Show actual finding counts, each check's completion/count, and existing 0/1/2
+result. Incomplete coverage is a warning and exit 2, never a clean success.
+Haunt shows baseline/block reason, attempted mutant counts, independently
+classified outcomes, mutation expression evidence, precise skip-record/path
+counts, AI and export status, then short recorded-result guidance. Killed is
+success; survivors/timeouts/errors are warnings. No evaluated candidates is
+neutral. Skips describe mutation selection, not test-execution exclusions.
+
+Escape untrusted paths, messages, expression evidence and explicitly shown AI
+text into single-line ASCII escapes. Never add raw source/diffs/credentials or
+hidden proposal code. Successful export display does not transform saved code.
+Verification/export does not change the original suite before manual adoption;
+survivors are not automatically bugs and results are not a safety verdict.
+Keep evidence in its section rather than repeating it in a long closing summary.
+
+Use fixed Unicode symbols/separators when stdout encoding supports them; otherwise
+use ASCII status words and separators. Unknown encoding is treated conservatively
+as ASCII. No ANSI escapes even on interactive terminals; JSON never uses these
+formatters. Font glyph availability cannot be inferred from an encoding.
+
+- [x] Inspect helpers/references; baseline 80 passed in 27.211s.
+- [x] Refactor scan sections/escaping: 15 preflight, 10 CLI and 6 reporting
+  tests pass. Python-scope exclusions remain separate from checked coverage.
+- [x] Refactor haunt sections/guidance: 6 reporting, 5 real analysis and 5
+  AI workflow/verification tests pass after fixing a missing local summary
+  reference caught by the first relevant run. Evidence is no longer repeated.
+- [x] Add encoding fallback: 8 reporting tests pass with real UTF-8/ASCII
+  redirected streams, injection escaping, status mapping and unchanged JSON
+  values. Real-Git preflight (15) and analysis (5) tests pass, comparing both
+  alias pairs' readable output as well as existing JSON/schema/privacy checks.
+- [x] Rehearse controlled examples and update README/DEMO/team guide. Scan:
+  1 whitespace plus 1 redacted suspected-secret finding, complete, exit 1.
+  Haunt: baseline 1 passed, boundary mutant survived, no AI/export, exit 1.
+  Both preserved original files/index and left no temporary run copies.
+  Final suite: 84 passed in 28.818s using
+  `PYTHONDONTWRITEBYTECODE=1 /private/tmp/ghost-pr-dev/bin/python -B -m unittest discover -s tests -v`.
+  Core file/index hashes and JSON/count/exit helper ASTs match the before capture.
+  No unused reporting imports; documentation shell syntax and git diff --check
+  pass. No dependencies, live AI, commits or pushes introduced.
+
 ### CLI readability refactor
 
 No external contract changes. parse_arguments accepts the existing argv list
@@ -626,9 +675,10 @@ exit 1 after a successful export. analysis_exit_code continues to describe core
 analysis only; export outcome is separate. Fatal inspection errors before any
 RunReport retain the existing error contract; no synthetic analysis is invented.
 
-Readable summary is derived only from RunReport: baseline status, killed/survived
+Readable sections are derived only from RunReport: baseline status, killed/survived
 evaluated counts, excluded timeout/error counts and recorded skips when present,
-AI request/verification state, export outcome and a relevant manual next step.
+AI request/verification state and export outcome. Closing guidance supplies
+caveats and a relevant manual next step without repeating the evidence.
 Handle baseline failure, zero mutants, all evaluated mutants killed, survivors,
 AI unavailable/unverified, verified without export, export failure and incomplete
 runs. It must not change the existing ratio, equate survivors with bugs, imply
